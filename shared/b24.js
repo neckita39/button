@@ -1,8 +1,9 @@
 /*
  * Стыковка с API интеграции Битрикс24 (бэкенд button, GET /livemap).
- * По умолчанию карта живёт на РЕАЛЬНЫХ данных: DEFAULT_API = <host>:3000/livemap.
+ * По умолчанию карта живёт на РЕАЛЬНЫХ данных: адрес бэкенда собирается из
+ * shared/config.js (window.LivingOfficeConfig: apiPort/apiPath либо apiUrl).
  * Параметр ?api=<url> задаёт другой адрес, ?api=off (off|mock|0) — принудительно
- * мок-режим. LivingOfficeB24.connect(engine, url) — поллинг раз в 5 сек.
+ * мок-режим. LivingOfficeB24.connect(engine, url) — поллинг раз в pollMs (5 сек).
  *
  * Ожидаемый ответ (любой из двух форматов):
  * 1) Полное расписание:
@@ -22,10 +23,15 @@
 (function () {
   'use strict';
 
-  // Бэкенд button на той же машине, что и страница; file:// → localhost.
-  var DEFAULT_API = (location.protocol === 'http:' || location.protocol === 'https:')
-    ? location.protocol + '//' + location.hostname + ':3000/livemap'
-    : 'http://localhost:3000/livemap';
+  // Адрес бэкенда — из shared/config.js; хост по умолчанию тот же, что у страницы
+  // (file:// → localhost). Полный CFG.apiUrl перебивает порт/путь.
+  var CFG = window.LivingOfficeConfig || {};
+  var API_PORT = CFG.apiPort || 3000;
+  var API_PATH = CFG.apiPath || '/livemap';
+  var DEFAULT_API = CFG.apiUrl
+    || ((location.protocol === 'http:' || location.protocol === 'https:')
+      ? location.protocol + '//' + location.hostname + ':' + API_PORT + API_PATH
+      : 'http://localhost:' + API_PORT + API_PATH);
 
   // Адрес живых данных из query-строки: ?api=off|mock|0 → null (моки),
   // ?api=<url> → свой адрес, без параметра → DEFAULT_API (реальные данные).
@@ -102,7 +108,7 @@
         });
     }
     poll();
-    timer = setInterval(poll, intervalMs || 5000);
+    timer = setInterval(poll, intervalMs || CFG.pollMs || 5000);
     return { stop: function () { clearInterval(timer); } };
   }
 

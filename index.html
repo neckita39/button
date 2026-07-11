@@ -212,6 +212,7 @@
 
 <div id="toast"><div class="b24">Б24</div><div><div class="tt"></div><div class="tx"></div></div></div>
 
+<script src="shared/config.js"></script>
 <script src="shared/core.js"></script>
 <script src="shared/b24.js"></script>
 <script>
@@ -224,7 +225,7 @@
   window.LO_ENGINE = engine;   // для демо-хуков и стыковки с Б24
   LO.mountDemoPanel(engine);
 
-  // живые данные: по умолчанию бэкенд button (<host>:3000/livemap);
+  // живые данные: по умолчанию бэкенд button (адрес — в shared/config.js);
   // ?api=<url> — другой адрес, ?api=off — принудительно моки
   var apiUrl = window.LivingOfficeB24 ? LivingOfficeB24.resolveApi(location.search) : null;
   if (apiUrl) LivingOfficeB24.connect(engine, apiUrl);
