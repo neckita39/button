@@ -486,11 +486,13 @@
     // аватарки на крыше
     el('g', { 'class': 'avs' }, g);
 
-    // подпись
-    var isBig = r.rect.w * r.rect.h >= 40;
+    // подпись: большие — на крыше, маленькие будки — сбоку слева, остальные снизу
+    var area = r.rect.w * r.rect.h;
+    var isBig = area >= 40, isTiny = area < 8;
     var label = el('text', {
-      x: c.x, y: isBig ? c.y - H + 8 : c.y + (r.rect.h * S * .5) + 26,
-      'text-anchor': 'middle', fill: '#eef0f6',
+      x: isTiny ? c.x - r.rect.w * S * .55 - 8 : c.x,
+      y: isBig ? c.y - H + 8 : (isTiny ? c.y - H * .35 : c.y + (r.rect.h * S * .5) + 26),
+      'text-anchor': isTiny ? 'end' : 'middle', fill: '#eef0f6',
       'font-size': isBig ? 15 : 12.5, 'font-weight': 700,
       'paint-order': 'stroke', stroke: 'rgba(8,10,16,.8)', 'stroke-width': 3
     }, g);
@@ -521,13 +523,19 @@
       A = iso.project(rc.x + rc.w, Math.max(rc.y + 0.15, d.y - DW / 2), S);
       B = iso.project(rc.x + rc.w, Math.min(rc.y + rc.h - 0.15, d.y + DW / 2), S);
     } else {
-      // дверь на скрытой грани — рисуем коврик у входа
-      var ox = Math.abs(d.x - rc.x) < 0.1 ? -0.55 : 0;
-      var oy = Math.abs(d.y - rc.y) < 0.1 ? -0.55 : 0;
-      var c = iso.project(d.x + ox, d.y + oy, S);
-      el('ellipse', { cx: c.x, cy: c.y, rx: 13, ry: 6.5,
-        fill: 'rgba(232,235,245,.2)', stroke: 'rgba(232,235,245,.4)',
-        'stroke-width': .8 }, g);
+      // дверь на скрытой грани — светлая метка на ребре крыши
+      var onLeft = Math.abs(d.x - rc.x) < 0.1;
+      var E0 = onLeft
+        ? iso.project(rc.x, Math.max(rc.y + 0.15, d.y - DW / 2), S)
+        : iso.project(Math.max(rc.x + 0.15, d.x - DW / 2), rc.y, S);
+      var E1 = onLeft
+        ? iso.project(rc.x, Math.min(rc.y + rc.h - 0.15, d.y + DW / 2), S)
+        : iso.project(Math.min(rc.x + rc.w - 0.15, d.x + DW / 2), rc.y, S);
+      el('line', { x1: E0.x, y1: E0.y - H, x2: E1.x, y2: E1.y - H,
+        stroke: 'rgba(240,244,255,.95)', 'stroke-width': 4,
+        'stroke-linecap': 'round' }, g);
+      el('circle', { cx: (E0.x + E1.x) / 2, cy: (E0.y + E1.y) / 2 - H,
+        r: 1.7, fill: '#0b0d13' }, g);
       return;
     }
     el('polygon', { points: iso.pts([
