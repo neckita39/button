@@ -174,9 +174,10 @@
   var engine = LO.createEngine();
   LO.mountDemoPanel(engine);
 
-  // живые данные от интеграции: scan.html?api=<url> (без параметра — моки)
-  var apiUrl = new URLSearchParams(location.search).get('api');
-  if (apiUrl && window.LivingOfficeB24) LivingOfficeB24.connect(engine, apiUrl);
+  // живые данные: по умолчанию бэкенд button (<host>:3000/livemap);
+  // ?api=<url> — другой адрес, ?api=off — принудительно моки
+  var apiUrl = window.LivingOfficeB24 ? LivingOfficeB24.resolveApi(location.search) : null;
+  if (apiUrl) LivingOfficeB24.connect(engine, apiUrl);
 
   var video = document.getElementById('video');
   var ar = document.getElementById('ar');

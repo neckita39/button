@@ -603,9 +603,17 @@
       checkIn: checkIn,
       releaseEarly: releaseEarly,
       setSchedule: function (roomId, events) { schedule[roomId] = events; },
-      // live-режим (?api=): часы движка = серверное время (минуты от полуночи),
-      // клиентский авто-релиз глушим — no-show решает сервер
-      syncClock: function (min) { simSec = min * 60; live = true; },
+      // live-режим: часы движка = серверное время (минуты от полуночи), клиентский
+      // авто-релиз глушим — no-show решает сервер. Первый вход в live стирает
+      // мок-расписание всех комнат: дальше единственный источник данных — сервер
+      // (комнаты без реальных броней остаются пустыми, а не с фейковыми встречами).
+      syncClock: function (min) {
+        if (!live) {
+          live = true;
+          Object.keys(schedule).forEach(function (id) { schedule[id] = []; });
+        }
+        simSec = min * 60;
+      },
       reset: reset,
       destroy: function () { cancelAnimationFrame(raf); }
     };

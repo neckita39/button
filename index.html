@@ -224,9 +224,10 @@
   window.LO_ENGINE = engine;   // для демо-хуков и стыковки с Б24
   LO.mountDemoPanel(engine);
 
-  // живые данные от интеграции: index.html?api=<url> (без параметра — моки)
-  var apiUrl = new URLSearchParams(location.search).get('api');
-  if (apiUrl && window.LivingOfficeB24) LivingOfficeB24.connect(engine, apiUrl);
+  // живые данные: по умолчанию бэкенд button (<host>:3000/livemap);
+  // ?api=<url> — другой адрес, ?api=off — принудительно моки
+  var apiUrl = window.LivingOfficeB24 ? LivingOfficeB24.resolveApi(location.search) : null;
+  if (apiUrl) LivingOfficeB24.connect(engine, apiUrl);
 
   var S = 30, H = 52, FUN_H = 10;
   var svg = document.getElementById('map');

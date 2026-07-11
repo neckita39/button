@@ -1,7 +1,8 @@
 /*
- * Стыковка с API интеграции Битрикс24 (коллега отдаёт JSON).
- * Активируется параметром ?api=<url> у index.html / scan.html:
- *   LivingOfficeB24.connect(engine, url) — поллинг раз в 10 сек.
+ * Стыковка с API интеграции Битрикс24 (бэкенд button, GET /livemap).
+ * По умолчанию карта живёт на РЕАЛЬНЫХ данных: DEFAULT_API = <host>:3000/livemap.
+ * Параметр ?api=<url> задаёт другой адрес, ?api=off (off|mock|0) — принудительно
+ * мок-режим. LivingOfficeB24.connect(engine, url) — поллинг раз в 5 сек.
  *
  * Ожидаемый ответ (любой из двух форматов):
  * 1) Полное расписание:
@@ -20,6 +21,19 @@
  */
 (function () {
   'use strict';
+
+  // Бэкенд button на той же машине, что и страница; file:// → localhost.
+  var DEFAULT_API = (location.protocol === 'http:' || location.protocol === 'https:')
+    ? location.protocol + '//' + location.hostname + ':3000/livemap'
+    : 'http://localhost:3000/livemap';
+
+  // Адрес живых данных из query-строки: ?api=off|mock|0 → null (моки),
+  // ?api=<url> → свой адрес, без параметра → DEFAULT_API (реальные данные).
+  function resolveApi(search) {
+    var v = new URLSearchParams(search != null ? search : location.search).get('api');
+    if (v === 'off' || v === 'mock' || v === '0') return null;
+    return v || DEFAULT_API;
+  }
 
   function toMin(v) {
     if (v == null) return null;
@@ -88,9 +102,14 @@
         });
     }
     poll();
-    timer = setInterval(poll, intervalMs || 10000);
+    timer = setInterval(poll, intervalMs || 5000);
     return { stop: function () { clearInterval(timer); } };
   }
 
-  window.LivingOfficeB24 = { connect: connect, _toMin: toMin };
+  window.LivingOfficeB24 = {
+    connect: connect,
+    resolveApi: resolveApi,
+    DEFAULT_API: DEFAULT_API,
+    _toMin: toMin
+  };
 })();
