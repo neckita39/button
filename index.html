@@ -989,7 +989,7 @@
           'linear-gradient(135deg,' + (p.accent || '#39415c') + '55, #12151f)';
       };
       cEls.img.style.display = '';
-      cEls.img.src = p.photo;
+      cEls.img.src = p.photo + '?v=2';  // версия против кэша браузера
       cEls.chips.textContent = '';
       if (isRoom) {
         cEls.chips.appendChild(chip('до ' + p.cap + ' чел'));
