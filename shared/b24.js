@@ -12,6 +12,11 @@
  * 2) Упрощённый статус («кто занял и до какого времени»):
  *    [{ "room": "krasnaya", "busy": true, "by": "Оля К.",
  *       "title": "Синк", "until": "15:45" }]
+ *
+ * Боевой ответ бэкенда button — объект { now, graceMin, rooms:[…] }, где
+ * now — серверное (портальное) время в минутах от полуночи: им синхронизируем
+ * часы движка (engine.syncClock), чтобы live-статусы совпали с реальностью.
+ * Время событий — минуты от полуночи или "HH:MM"/ISO (см. toMin).
  */
 (function () {
   'use strict';
@@ -55,12 +60,25 @@
     }
   }
 
+  // Синхронизация часов движка: сервер прислал now (минуты от полуночи) — берём его;
+  // иначе фолбэк на локальные настенные часы браузера (демо: портал и ноут в одном TZ).
+  function syncClock(engine, rows) {
+    if (!engine.syncClock) return;                       // старый движок без live-режима
+    if (rows && !Array.isArray(rows) && typeof rows.now === 'number') {
+      engine.syncClock(rows.now);
+    } else {
+      var d = new Date();
+      engine.syncClock(d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60);
+    }
+  }
+
   function connect(engine, url, intervalMs) {
     var timer = null;
     function poll() {
       fetch(url, { cache: 'no-store' })
         .then(function (r) { return r.json(); })
         .then(function (rows) {
+          syncClock(engine, rows);                        // сперва часы, затем расписание
           (Array.isArray(rows) ? rows : rows.rooms || []).forEach(function (row) {
             applyRow(engine, row);
           });

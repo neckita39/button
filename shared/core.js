@@ -321,6 +321,7 @@
     var schedule = makeSchedule();
     var simSec = SIM_START_MIN * 60;
     var speed = 1;              // сим-секунд за реальную секунду
+    var live = false;           // live-режим (?api=): источник правды — сервер, не мок
     var feed = [];
     var lastStatuses = {};
     var lastMinute = -1;
@@ -476,13 +477,15 @@
       lastTs = ts;
       simSec += dt * speed;
 
-      // просроченные grace-дедлайны
-      Object.keys(schedule).forEach(function (roomId) {
-        var e = currentEvent(roomId);
-        if (e && e.checkedInAt == null && nowMin() >= e.start + graceMin) {
-          releaseNoShow(roomId, e);
-        }
-      });
+      // просроченные grace-дедлайны (только мок: в live no-show решает сервер)
+      if (!live) {
+        Object.keys(schedule).forEach(function (roomId) {
+          var e = currentEvent(roomId);
+          if (e && e.checkedInAt == null && nowMin() >= e.start + graceMin) {
+            releaseNoShow(roomId, e);
+          }
+        });
+      }
 
       // изменения статусов
       ROOMS.forEach(function (r) {
@@ -557,6 +560,9 @@
       checkIn: checkIn,
       releaseEarly: releaseEarly,
       setSchedule: function (roomId, events) { schedule[roomId] = events; },
+      // live-режим (?api=): часы движка = серверное время (минуты от полуночи),
+      // клиентский авто-релиз глушим — no-show решает сервер
+      syncClock: function (min) { simSec = min * 60; live = true; },
       reset: reset,
       destroy: function () { cancelAnimationFrame(raf); }
     };
