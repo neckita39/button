@@ -59,6 +59,9 @@
   @keyframes flash { from { opacity: .9; } to { opacity: 0; transform: scale(2.6); } }
   .av { transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
   .funzone { cursor: pointer; }
+  .me-pin { animation: mepulse 2s ease-in-out infinite; transform-box: fill-box;
+    transform-origin: center; }
+  @keyframes mepulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
 
   /* ---------- лента (десктоп) ---------- */
   #feedbox { position: fixed; z-index: 15; right: 16px; top: 86px; width: 300px;
@@ -262,10 +265,11 @@
     var pad = 70;
     if (!view) {
       if (window.innerWidth < 760) {
-        // мобильный старт: зум на центр крыла, дальше — пан/пинч
+        // мобильный старт: зум на холл, дальше — пан/пинч к крыльям
         var aspect = svg.clientHeight / Math.max(1, svg.clientWidth);
-        var vw = b.w * 0.62, vh = vw * aspect;
-        view = { x: b.x + b.w / 2 - vw / 2, y: b.y + b.h / 2 - vh / 2 + 40, w: vw, h: vh };
+        var cc = iso.project(43, 12, S);
+        var vw = b.w * 0.38, vh = vw * aspect;
+        view = { x: cc.x - vw / 2, y: cc.y - vh / 2 - 20, w: vw, h: vh };
       } else {
         view = { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 + 40 };
       }
@@ -274,32 +278,180 @@
 
     var world = el('g', { id: 'world' }, svg);
 
-    // плита пола + сетка
-    var fp = iso.prism(LO.FLOOR, S, 0);
+    var f = LO.FLOOR;
+
+    // плита-основание
+    var fp = iso.prism(f, S, 0);
     el('polygon', { points: iso.pts(fp.floor.map(function (p) { return { x: p.x, y: p.y + 14 }; })),
       fill: '#0e111a' }, world);
-    el('polygon', { points: iso.pts(fp.floor), fill: '#181c2a', stroke: '#262b3d',
-      'stroke-width': 1.2 }, world);
-    var grid = el('g', { stroke: '#20263a', 'stroke-width': .5, opacity: .7 }, world);
-    var f = LO.FLOOR, gp, gq, i;
-    for (i = 0; i <= f.w; i += 2) {
-      gp = iso.project(f.x + i, f.y, S); gq = iso.project(f.x + i, f.y + f.h, S);
-      el('line', { x1: gp.x, y1: gp.y, x2: gq.x, y2: gq.y }, grid);
-    }
-    for (i = 0; i <= f.h; i += 2) {
-      gp = iso.project(f.x, f.y + i, S); gq = iso.project(f.x + f.w, f.y + i, S);
-      el('line', { x1: gp.x, y1: gp.y, x2: gq.x, y2: gq.y }, grid);
-    }
 
-    // объекты по глубине: фан-зоны и комнаты вместе
-    var items = LO.ROOMS.map(function (r) { return { kind: 'room', o: r }; })
-      .concat(LO.FUNZONES.map(function (z) { return { kind: 'fun', o: z }; }));
+    // каменная плитка в шахматку — как в реальном офисе, приглушена под ночь
+    var tones = ['#453f36', '#33302b', '#4e473d'];
+    var paths = ['', '', ''];
+    var i, j;
+    for (i = 0; i < f.w; i++) {
+      for (j = 0; j < f.h; j++) {
+        var c0 = iso.project(f.x + i, f.y + j, S),
+            c1 = iso.project(f.x + i + 1, f.y + j, S),
+            c2 = iso.project(f.x + i + 1, f.y + j + 1, S),
+            c3 = iso.project(f.x + i, f.y + j + 1, S);
+        var tone = (i + j) % 2 ? 1 : 0;
+        if ((i * 7 + j * 13) % 19 === 0) tone = 2;
+        paths[tone] += 'M' + c0.x.toFixed(1) + ' ' + c0.y.toFixed(1) +
+          'L' + c1.x.toFixed(1) + ' ' + c1.y.toFixed(1) +
+          'L' + c2.x.toFixed(1) + ' ' + c2.y.toFixed(1) +
+          'L' + c3.x.toFixed(1) + ' ' + c3.y.toFixed(1) + 'Z';
+      }
+    }
+    paths.forEach(function (d, k) {
+      el('path', { d: d, fill: tones[k], stroke: '#14161e',
+        'stroke-width': .55, 'stroke-opacity': .7 }, world);
+    });
+    el('polygon', { points: iso.pts(fp.floor), fill: 'none', stroke: '#262b3d',
+      'stroke-width': 1.4 }, world);
+
+    // подписи зон на полу
+    LO.AREAS.forEach(function (a) {
+      var c = iso.project((a.x0 + a.x1) / 2, 22.4, S);
+      var t = el('text', { x: c.x, y: c.y, 'text-anchor': 'middle', 'font-size': 34,
+        'font-weight': 800, fill: 'rgba(232,235,245,.07)', 'letter-spacing': 8 }, world);
+      t.textContent = a.name.toUpperCase();
+    });
+
+    // порядок отрисовки: фон-стены → зона → стена-перегородка → зона → …
+    // фазы: 0 задние стены · 1 разработка · 2 стена 27.5 · 3 холл · 4 стена 58.5 · 5 QA
+    function zonePhase(cx) { return cx < 27.5 ? 1 : cx < 58.5 ? 3 : 5; }
+    var items = [];
+    function pushObj(rect, fn) {
+      items.push({ phase: zonePhase(rect.x + (rect.w || 0) / 2),
+        sub: rect.x + rect.y, f: fn });
+    }
+    LO.ROOMS.forEach(function (r) { pushObj(r.rect, function () { buildRoom(world, r); }); });
+    LO.FUNZONES.forEach(function (z) { pushObj(z.rect, function () { buildFun(world, z); }); });
+    LO.DECOR.forEach(function (d) { pushObj(d.rect, function () { buildDecor(world, d); }); });
+    LO.DESKS.forEach(function (d) { pushObj({ x: d.x, y: d.y, w: d.cols * 1.6 },
+      function () { buildDeskCluster(world, d); }); });
+    LO.WALLS.forEach(function (w) {
+      var backWall = (w.a.y === 0 && w.b.y === 0) || (w.a.x === 0 && w.b.x === 0);
+      var phase = backWall ? 0 : (w.a.x < 40 ? 2 : 4);
+      var dx = w.b.x - w.a.x, dy = w.b.y - w.a.y;
+      var steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 3));
+      for (var s = 0; s < steps; s++) {
+        (function (s2) {
+          var p0 = { x: w.a.x + dx * s2 / steps,       y: w.a.y + dy * s2 / steps };
+          var p1 = { x: w.a.x + dx * (s2 + 1) / steps, y: w.a.y + dy * (s2 + 1) / steps };
+          var art = (w.art && s2 === Math.floor(steps / 2)) ? w.art : null;
+          items.push({ phase: phase, sub: p0.x + p0.y,
+            f: function () { buildWallChunk(world, p0, p1, w.h, art); } });
+        })(s);
+      }
+    });
     items.sort(function (a, b2) {
-      return (a.o.rect.x + a.o.rect.y) - (b2.o.rect.x + b2.o.rect.y);
+      return a.phase - b2.phase || a.sub - b2.sub;
     });
-    items.forEach(function (it) {
-      if (it.kind === 'room') buildRoom(world, it.o); else buildFun(world, it.o);
-    });
+    items.forEach(function (it) { it.f(); });
+  }
+
+  /* белые стены офиса; на некоторых — полигональный рисунок */
+  var ART = {
+    deer:  ['#e58fb1', '#f2b56b', '#7fc8c2', '#b593d6', '#f2dc6b', '#e58fb1', '#7fc8c2'],
+    whale: ['#5b8def', '#7fb0e8', '#3d6fd8', '#9fc5f2', '#4a5f9e', '#5b8def', '#7fb0e8']
+  };
+
+  function buildWallChunk(parent, a, b, h, art) {
+    var A = iso.project(a.x, a.y, S), B = iso.project(b.x, b.y, S);
+    var horizontal = Math.abs(b.y - a.y) < 0.01;
+    el('polygon', { points: iso.pts([
+      { x: A.x, y: A.y - h }, { x: B.x, y: B.y - h }, B, A]),
+      fill: horizontal ? '#8e94a8' : '#7c8296', 'fill-opacity': .96 }, parent);
+    el('line', { x1: A.x, y1: A.y - h, x2: B.x, y2: B.y - h,
+      stroke: '#c9cede', 'stroke-width': 1.6 }, parent);
+    if (art) {
+      var pal = ART[art] || ART.deer;
+      var mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2 - h * 0.52;
+      var dirx = (B.x - A.x) / Math.max(1, Math.hypot(B.x - A.x, B.y - A.y));
+      var diry = (B.y - A.y) / Math.max(1, Math.hypot(B.x - A.x, B.y - A.y));
+      for (var i = 0; i < 7; i++) {
+        var off = (i - 3) * 9;
+        var cx = mx + dirx * off, cy = my + diry * off + ((i % 3) - 1) * 6;
+        var s1 = 7 + (i % 3) * 4;
+        el('polygon', { points:
+          (cx) + ',' + (cy - s1) + ' ' + (cx + s1 * .9) + ',' + (cy + s1 * .6) + ' ' +
+          (cx - s1 * .8) + ',' + (cy + s1 * .5),
+          fill: pal[i], 'fill-opacity': .85 }, parent);
+      }
+    }
+  }
+
+  /* столы рассадки: столешница + монитор + стул; «Я» — золотой пин */
+  function buildDeskCluster(parent, d) {
+    var DW = 1.35, DHt = 1.05, GX = 0.25, GY = 0.45;
+    for (var r = 0; r < d.rows; r++) {
+      for (var c = 0; c < d.cols; c++) {
+        var name = d.names[r * d.cols + c] || '';
+        var rect = { x: d.x + c * (DW + GX), y: d.y + r * (DHt + GY), w: DW, h: DHt };
+        var p = iso.prism(rect, S, 7);
+        var c2 = iso.center(rect, S);
+        // стул перед столом
+        var ch = iso.project(rect.x + rect.w / 2, rect.y + rect.h + 0.42, S);
+        el('ellipse', { cx: ch.x, cy: ch.y, rx: 6.5, ry: 3.4, fill: '#2a3042',
+          stroke: '#3c445c', 'stroke-width': .7 }, parent);
+        // столешница
+        el('polygon', { points: iso.pts(p.right), fill: '#2b3145' }, parent);
+        el('polygon', { points: iso.pts(p.front), fill: '#252b3d' }, parent);
+        el('polygon', { points: iso.pts(p.top), fill: '#4a5168', stroke: '#5b6378',
+          'stroke-width': .6, 'stroke-opacity': .8 }, parent);
+        // монитор на столе
+        var m0 = iso.project(rect.x + 0.25, rect.y + 0.35, S),
+            m1 = iso.project(rect.x + rect.w - 0.25, rect.y + 0.35, S);
+        el('polygon', { points: iso.pts([
+          { x: m0.x, y: m0.y - 17 }, { x: m1.x, y: m1.y - 17 },
+          { x: m1.x, y: m1.y - 8 }, { x: m0.x, y: m0.y - 8 }]),
+          fill: '#0c0e15', stroke: '#5b6378', 'stroke-width': .8 }, parent);
+        if (name.indexOf('(я)') > -1) {
+          el('circle', { 'class': 'me-pin', cx: c2.x, cy: c2.y - 26, r: 5.5,
+            fill: '#f5c542', stroke: '#0b0d13', 'stroke-width': 1.5 }, parent);
+          var tm = el('text', { x: c2.x, y: c2.y - 23.6, 'text-anchor': 'middle',
+            'font-size': 6.5, 'font-weight': 800, fill: '#201503' }, parent);
+          tm.textContent = 'Я';
+        }
+      }
+    }
+  }
+
+  /* ресепшн (дерево + мосс-стена Битрикс24) и лифт */
+  function buildDecor(parent, d) {
+    var c = iso.center(d.rect, S);
+    if (d.kind === 'reception') {
+      var wa = { x: d.rect.x - 0.3, y: d.rect.y - 0.4 },
+          wb = { x: d.rect.x + d.rect.w + 0.3, y: d.rect.y - 0.4 };
+      var WA = iso.project(wa.x, wa.y, S), WB = iso.project(wb.x, wb.y, S);
+      el('polygon', { points: iso.pts([
+        { x: WA.x, y: WA.y - 34 }, { x: WB.x, y: WB.y - 34 }, WB, WA]),
+        fill: '#2c5535' }, parent);
+      var bt = el('text', { x: (WA.x + WB.x) / 2, y: (WA.y + WB.y) / 2 - 18,
+        'text-anchor': 'middle', 'font-size': 10, 'font-weight': 750,
+        fill: '#dff0e2', 'letter-spacing': 1 }, parent);
+      bt.textContent = 'Битрикс24';
+      var p = iso.prism(d.rect, S, 13);
+      el('polygon', { points: iso.pts(p.right), fill: '#96793f' }, parent);
+      el('polygon', { points: iso.pts(p.front), fill: '#b08e55' }, parent);
+      el('polygon', { points: iso.pts(p.top), fill: '#c9a86a' }, parent);
+      var t = el('text', { x: c.x, y: c.y + 18, 'text-anchor': 'middle',
+        'font-size': 9.5, fill: '#8b93ab', 'font-weight': 650,
+        'paint-order': 'stroke', stroke: 'rgba(8,10,16,.85)', 'stroke-width': 2.5 }, parent);
+      t.textContent = 'Ресепшн';
+    } else {
+      var p2 = iso.prism(d.rect, S, 42);
+      el('polygon', { points: iso.pts(p2.right), fill: '#242a38' }, parent);
+      el('polygon', { points: iso.pts(p2.front), fill: '#2c3242' }, parent);
+      el('polygon', { points: iso.pts(p2.top), fill: '#3a4152', stroke: '#4a5166',
+        'stroke-width': 1 }, parent);
+      var t2 = el('text', { x: c.x, y: c.y - 8, 'text-anchor': 'middle',
+        'font-size': 11, 'font-weight': 700, fill: '#8b93ab',
+        'paint-order': 'stroke', stroke: 'rgba(8,10,16,.85)', 'stroke-width': 3 }, parent);
+      t2.textContent = 'Лифт';
+    }
   }
 
   function shade(hex, k) { // затемнение цвета
@@ -327,6 +479,7 @@
       'fill-opacity': .5, stroke: r.accent, 'stroke-opacity': .5, 'stroke-width': 1 }, g);
     el('polygon', { points: iso.pts(p.front), fill: shade(r.accent, .72),
       'fill-opacity': .42, stroke: r.accent, 'stroke-opacity': .5, 'stroke-width': 1 }, g);
+    buildDoor(g, r);
     el('polygon', { 'class': 'top', points: iso.pts(p.top), fill: r.accent,
       'fill-opacity': .26, stroke: r.accent, 'stroke-opacity': .95, 'stroke-width': 1.6 }, g);
 
@@ -353,6 +506,36 @@
       fill: '#e8ebf5' }, chip);
     ct.textContent = '';
     updateRoom(r.id, true);
+  }
+
+  /* схематичная дверь: панель на видимой грани куба или коврик у скрытой */
+  function buildDoor(g, r) {
+    var d = r.door, rc = r.rect, DW = 0.95, hpx = H * 0.74;
+    var onFront = Math.abs(d.y - (rc.y + rc.h)) < 0.1;
+    var onRight = Math.abs(d.x - (rc.x + rc.w)) < 0.1;
+    var A, B;
+    if (onFront) {
+      A = iso.project(Math.max(rc.x + 0.15, d.x - DW / 2), rc.y + rc.h, S);
+      B = iso.project(Math.min(rc.x + rc.w - 0.15, d.x + DW / 2), rc.y + rc.h, S);
+    } else if (onRight) {
+      A = iso.project(rc.x + rc.w, Math.max(rc.y + 0.15, d.y - DW / 2), S);
+      B = iso.project(rc.x + rc.w, Math.min(rc.y + rc.h - 0.15, d.y + DW / 2), S);
+    } else {
+      // дверь на скрытой грани — рисуем коврик у входа
+      var ox = Math.abs(d.x - rc.x) < 0.1 ? -0.55 : 0;
+      var oy = Math.abs(d.y - rc.y) < 0.1 ? -0.55 : 0;
+      var c = iso.project(d.x + ox, d.y + oy, S);
+      el('ellipse', { cx: c.x, cy: c.y, rx: 13, ry: 6.5,
+        fill: 'rgba(232,235,245,.2)', stroke: 'rgba(232,235,245,.4)',
+        'stroke-width': .8 }, g);
+      return;
+    }
+    el('polygon', { points: iso.pts([
+      { x: A.x, y: A.y - hpx }, { x: B.x, y: B.y - hpx }, B, A]),
+      fill: 'rgba(10,12,18,.5)', stroke: 'rgba(240,244,255,.8)',
+      'stroke-width': 1.2 }, g);
+    el('circle', { cx: A.x + (B.x - A.x) * .78, cy: A.y + (B.y - A.y) * .78 - hpx * .45,
+      r: 1.6, fill: '#e8ebf5' }, g);
   }
 
   function buildFun(parent, z) {

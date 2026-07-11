@@ -12,48 +12,105 @@
 
   /* ---------- Крыло-заглушка (метры). Заменится на реальный план. ---------- */
 
-  /* Реальное крыло по наброску (координаты — клетки эскиза).
+  /* Весь этаж по наброскам: Разработка (0..27) — Холл (28..58) — QA (59..86).
      Комнаты — стеклянные цветные кубы: accent = цвет стекла в жизни,
      статус показываем светом/аурой, НЕ перекраской куба. */
   var ROOMS = [
-    { id: 'tushinsky', name: 'Кабинет Тушинского', cap: 6,
-      features: ['ТВ'], accent: '#c94fb6', photo: 'photos/tushinsky.jpg',
-      rect: { x: 6,    y: 1.5,  w: 5.5,  h: 10  }, door: { x: 8.5,  y: 11.5 } },
-    { id: 'krasnaya', name: 'Красная', cap: 3,
-      features: ['Диван'], accent: '#e03a4e', photo: 'photos/krasnaya.jpg',
-      rect: { x: 11.5, y: 7,    w: 2.2,  h: 4.5 }, door: { x: 11.5, y: 10.3 } },
-    { id: 'golubaya-left', name: 'Голубая левая', cap: 4,
-      features: ['Диван'], accent: '#3d6fd8', photo: 'photos/golubaya-left.jpg',
-      rect: { x: 18.7, y: 0,    w: 5.5,  h: 6.5 }, door: { x: 23.2, y: 6.5 } },
-    { id: 'golubaya-right', name: 'Голубая правая', cap: 4,
-      features: ['Диван'], accent: '#2e9bd6', photo: 'photos/golubaya-right.jpg',
-      rect: { x: 24.2, y: 0,    w: 4.4,  h: 6.5 }, door: { x: 26,   y: 6.5 } },
-    { id: 'ryzhikov', name: 'Кабинет Рыжикова', cap: 10,
-      features: ['Флипчарт', 'Диван'], accent: '#2fb08a', photo: 'photos/ryzhikov.jpg',
-      rect: { x: 28.6, y: 0,    w: 10.4, h: 29  }, door: { x: 28.6, y: 9.7 } },
-    { id: 'zelenaya', name: 'Зелёная', cap: 8,
+    { id: 'zelenaya', name: 'Зелёная', cap: 8, zone: 'dev',
       features: ['Стол на 8'], accent: '#59b93c', photo: 'photos/zelenaya.jpg',
-      rect: { x: 2.7,  y: 13.5, w: 6.3,  h: 5.5 }, door: { x: 9,    y: 15.2 } },
-    { id: 'zheltaya', name: 'Жёлтая', cap: 5,
+      rect: { x: 10,   y: 9,    w: 7,   h: 6   }, door: { x: 17,   y: 12 } },
+    { id: 'tushinsky', name: 'Кабинет Тушинского', cap: 6, zone: 'dev',
+      features: ['ТВ'], accent: '#c94fb6', photo: 'photos/tushinsky.jpg',
+      rect: { x: 21.5, y: 1.5,  w: 5.5, h: 8   }, door: { x: 24,   y: 9.5 } },
+    { id: 'krasnaya', name: 'Красная', cap: 3, zone: 'hall',
+      features: ['Диван'], accent: '#e03a4e', photo: 'photos/krasnaya.jpg',
+      rect: { x: 28.3, y: 7.1,  w: 4.5, h: 2.4 }, door: { x: 30.2, y: 9.5 } },
+    { id: 'golubaya-left', name: 'Голубая левая', cap: 1, zone: 'hall',
+      features: ['Кресло'], accent: '#3d6fd8', photo: 'photos/golubaya-left.jpg',
+      rect: { x: 56.3, y: 2.8,  w: 2.2, h: 2.2 }, door: { x: 57.4, y: 5 } },
+    { id: 'golubaya-right', name: 'Голубая правая', cap: 1, zone: 'hall',
+      features: ['Кресло'], accent: '#2e9bd6', photo: 'photos/golubaya-right.jpg',
+      rect: { x: 56.3, y: 5.6,  w: 2.2, h: 2.2 }, door: { x: 57.4, y: 7.8 } },
+    { id: 'zheltaya', name: 'Жёлтая', cap: 5, zone: 'hall',
       features: ['ТВ', 'Пуфики'], accent: '#e8c22e', photo: 'photos/zheltaya.jpg',
-      rect: { x: 22,   y: 21.3, w: 5.2,  h: 7.7 }, door: { x: 23,   y: 21.3 } }
+      rect: { x: 54,   y: 16.5, w: 4.5, h: 5.5 }, door: { x: 55.2, y: 22 } },
+    { id: 'ryzhikov', name: 'Кабинет Рыжикова', cap: 10, zone: 'qa',
+      features: ['Флипчарт', 'Диван'], accent: '#2fb08a', photo: 'photos/ryzhikov.jpg',
+      rect: { x: 75,   y: 5,    w: 10,  h: 13  }, door: { x: 75,   y: 11 } }
   ];
 
   /* Фан-зоны — не бронируются, живут на карте для настроения. */
   var FUNZONES = [
     { id: 'massage',  name: 'Массаж',  emoji: '💆', photo: 'photos/massage.jpg',
       note: 'Массажное кресло — не бронируется, просто приходи',
-      rect: { x: 12.2, y: 1.6, w: 1.7, h: 1.4 } },
+      rect: { x: 30.5, y: 2,   w: 1.8, h: 1.5 } },
     { id: 'tennis',   name: 'Теннис',  emoji: '🏓', photo: 'photos/tennis.jpg',
       note: 'Настольный теннис — не бронируется, просто приходи',
-      rect: { x: 13.5, y: 7,   w: 3.2, h: 2.4 } },
+      rect: { x: 38,   y: 6,   w: 6,   h: 3   } },
     { id: 'football', name: 'Футбол',  emoji: '⚽', photo: 'photos/football.jpg',
       note: 'Настольный футбол — не бронируется, просто приходи',
-      rect: { x: 17.4, y: 3.6, w: 1.5, h: 2.2 } }
+      rect: { x: 46.5, y: 7.5, w: 1.8, h: 2.4 } }
   ];
 
-  /* Габариты крыла (клетки эскиза) — общий пол. */
-  var FLOOR = { x: 0, y: 0, w: 39, h: 29 };
+  /* Габариты этажа (клетки эскизов) — общий пол. */
+  var FLOOR = { x: 0, y: 0, w: 86, h: 24 };
+
+  /* Зоны этажа — подписи и границы по x. */
+  var AREAS = [
+    { id: 'dev',  name: 'Разработка', x0: 0,    x1: 27.5 },
+    { id: 'hall', name: 'Холл',       x0: 27.5, x1: 58.5 },
+    { id: 'qa',   name: 'QA',         x0: 58.5, x1: 86 }
+  ];
+
+  /* Стены: белые, местами с полигональным рисунком (олень, кит — как в
+     офисе). Сегменты с проёмами: выходы из холла и переходы между зонами. */
+  var WALLS = [
+    { a: { x: 0,    y: 0 },  b: { x: 31,   y: 0 },  h: 40, art: 'deer' },
+    { a: { x: 33,   y: 0 },  b: { x: 53,   y: 0 },  h: 40 },
+    { a: { x: 55,   y: 0 },  b: { x: 86,   y: 0 },  h: 40, art: 'whale' },
+    { a: { x: 0,    y: 0 },  b: { x: 0,    y: 24 }, h: 40 },
+    { a: { x: 27.5, y: 0 },  b: { x: 27.5, y: 13 }, h: 40 },
+    { a: { x: 27.5, y: 17 }, b: { x: 27.5, y: 24 }, h: 40 },
+    { a: { x: 58.5, y: 0 },  b: { x: 58.5, y: 9 },  h: 40 },
+    { a: { x: 58.5, y: 13 }, b: { x: 58.5, y: 24 }, h: 40 }
+  ];
+
+  /* Декор холла: стойка ресепшн (дерево + мосс-стена Битрикс24) и лифт. */
+  var DECOR = [
+    { id: 'reception', kind: 'reception', name: 'Ресепшн',
+      rect: { x: 36, y: 13.5, w: 10, h: 1.6 } },
+    { id: 'lift', kind: 'lift', name: 'Лифт',
+      rect: { x: 34, y: 19, w: 9, h: 4.5 } }
+  ];
+
+  /* Рассадка крыла разработки — столы с именами (по наброску,
+     пустая строка = свободный стол). QA — столы без имён. */
+  var DESKS = [
+    { x: 7,    y: 1.5, cols: 5, rows: 2, names: [
+      'Скуратов', 'Безоп', 'Безоп', 'Безоп', 'Панков Юрий',
+      'Павлюченя Артём', '', 'Бердников Дмитрий', 'Вайда Максим', ''] },
+    { x: 2,    y: 6,   cols: 3, rows: 2, names: [
+      'Носарев Евгений', 'Рубинский Александр', 'Власенко Мария',
+      'Канищенко Артём', 'Демченко Карина', 'Филатов Никита'] },
+    { x: 19,   y: 12,  cols: 3, rows: 2, names: [
+      'Кексибез Данчель', 'Лаудерт Алексей', 'Богачев Кирилл',
+      'Голенищев Иван', 'Шатура Евгений', 'Рогов Артём'] },
+    { x: 2,    y: 17,  cols: 3, rows: 2, names: [
+      'Макарзов Владислав', 'Мельников Савва', 'Рогов Пётр',
+      'Герасимюк Антон', 'Юрбаева Ирина', ''] },
+    { x: 9,    y: 16,  cols: 2, rows: 4, names: [
+      'Киселёв Артём', 'Зылёв Антон', 'Гобкуль Руслан', 'Жаклышин Фёдор',
+      '', 'Бяккин Всеволод', 'Ланкин Леонид', 'Макаров Андрей'] },
+    { x: 13.5, y: 16,  cols: 2, rows: 4, names: [
+      'Панасевич Александр', 'Винников Кирилл', 'Казанцев Илья', 'Тарасов Тимофей',
+      'Панасевич Павел', 'Зорка Александр', 'Щерба Никита', 'Брюхинов Андрей'] },
+    { x: 20,   y: 17,  cols: 4, rows: 2, names: [
+      'Цупраков Владислав', 'Мотевский Сергей', 'Усбишев Матвей', 'Виласека Орландо',
+      'Грезьбов Лев', 'Рембов Артём', 'Ведревкин Даниил', 'Лошков Максим'] },
+    { x: 22.5, y: 21,  cols: 2, rows: 1, names: ['Никита (я)', 'Шелешков Евгений'] },
+    { x: 62,   y: 4,   cols: 3, rows: 2, names: ['', '', '', '', '', ''] },
+    { x: 62,   y: 15,  cols: 3, rows: 2, names: ['', '', '', '', '', ''] }
+  ];
 
   /* ---------- Расписание-мок (минуты от полуночи) ---------- */
 
@@ -411,6 +468,10 @@
       rooms: ROOMS,
       funzones: FUNZONES,
       floor: FLOOR,
+      walls: WALLS,
+      decor: DECOR,
+      desks: DESKS,
+      areas: AREAS,
       workday: WORKDAY,
       graceMin: graceMin,
       on: on,
@@ -479,6 +540,10 @@
     ROOMS: ROOMS,
     FUNZONES: FUNZONES,
     FLOOR: FLOOR,
+    WALLS: WALLS,
+    DECOR: DECOR,
+    DESKS: DESKS,
+    AREAS: AREAS,
     GRACE_MIN: GRACE_MIN,
     WORKDAY: WORKDAY,
     createEngine: createEngine,
