@@ -1,0 +1,456 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Живой офис · QR-тур</title>
+<style>
+  :root {
+    --bg: #0e1016; --panel: rgba(16, 18, 26, .88); --line: #2a2f42;
+    --text: #eef0f6; --dim: #9aa2b8; --amber: #f5a623;
+    --free: #34c26b; --busy: #5b8def; --wait: #f5a623;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.45 -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    overflow: hidden; }
+  #video { position: fixed; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; background: #000; }
+  #ar { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #ar polygon { fill: rgba(245, 166, 35, .08); stroke: var(--amber);
+    stroke-width: 3; stroke-linejoin: round; }
+
+  /* верхняя плашка */
+  #topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    background: linear-gradient(rgba(10, 11, 16, .85), transparent); }
+  #topbar .logo { font-weight: 800; letter-spacing: -.02em; }
+  #topbar .hint { color: var(--dim); font-size: 13px; }
+  #topbar .clock { margin-left: auto; font-family: ui-monospace, Menlo, monospace;
+    font-size: 13px; color: var(--dim); }
+
+  /* карточка комнаты */
+  #card { position: fixed; z-index: 6; width: 300px; max-width: calc(100vw - 24px);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .5); backdrop-filter: blur(10px);
+    opacity: 0; transform: translate(-50%, -100%) translateY(-14px) scale(.96);
+    transition: opacity .25s; pointer-events: none; will-change: left, top; }
+  #card.show { opacity: 1; pointer-events: auto; }
+  #card.docked { left: 50% !important; top: auto !important;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    transform: translate(-50%, 0); transition: opacity .25s, bottom .3s; }
+  #card .head { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 0; }
+  #card .name { font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
+  #card .cap { color: var(--dim); font-size: 12px; white-space: nowrap; }
+  #card .accent { height: 3px; border-radius: 3px 3px 0 0; margin: -1px -1px 0; }
+  #card .status { display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px 2px; font-weight: 650; }
+  #card .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  #card .sub { padding: 2px 14px; color: var(--dim); font-size: 13px; }
+  #card .badge { display: inline-block; margin: 6px 14px 0; padding: 3px 9px;
+    border-radius: 20px; font-size: 12px; font-weight: 650;
+    background: rgba(52, 194, 107, .16); color: var(--free); }
+  #card .badge.noshow { background: rgba(245, 166, 35, .14); color: var(--wait); }
+  #card .timer { font-family: ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  #card .next { padding: 8px 14px 0; font-size: 13px; color: var(--dim); }
+  #card .next b { color: var(--text); font-weight: 650; }
+
+  /* таймлайн дня */
+  #card .tl { position: relative; height: 26px; margin: 10px 14px 4px;
+    background: rgba(255, 255, 255, .06); border-radius: 6px; overflow: hidden; }
+  #card .tl .ev { position: absolute; top: 3px; bottom: 3px; border-radius: 4px;
+    background: var(--busy); opacity: .85; }
+  #card .tl .ev.past { opacity: .3; }
+  #card .tl .ev.cur { box-shadow: 0 0 0 1.5px #fff inset; }
+  #card .tl .ev.ghost { opacity: .28;
+    background: repeating-linear-gradient(135deg, var(--wait) 0 4px, transparent 4px 8px); }
+  #card .tl .now { position: absolute; top: 0; bottom: 0; width: 2px;
+    background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.9); }
+  #card .tlcap { display: flex; justify-content: space-between; margin: 0 14px;
+    color: var(--dim); font-size: 10px; font-family: ui-monospace, Menlo, monospace; }
+  #card .summary { padding: 8px 14px 0; font-size: 13px; color: var(--dim); }
+  #card .actions { padding: 12px 14px 14px; }
+  #card .knock { width: 100%; padding: 10px 0; border: 0; border-radius: 10px;
+    background: var(--amber); color: #201503; font-weight: 750; font-size: 14px;
+    cursor: pointer; }
+  #card .knock:active { transform: scale(.985); }
+  #card .note { padding: 8px 14px 0; font-size: 13.5px; }
+
+  /* прицел-подсказка */
+  #hintbox { position: fixed; left: 50%; top: 50%; z-index: 4;
+    transform: translate(-50%, -50%); text-align: center; color: var(--dim);
+    transition: opacity .4s; }
+  #hintbox .frame { width: 180px; height: 180px; margin: 0 auto 14px; position: relative; }
+  #hintbox .frame i { position: absolute; width: 34px; height: 34px;
+    border: 3px solid rgba(255, 255, 255, .8); }
+  #hintbox .frame i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 8px 0 0 0; }
+  #hintbox .frame i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 8px 0 0; }
+  #hintbox .frame i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 8px; }
+  #hintbox .frame i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 8px 0; }
+  #hintbox.off { opacity: 0; }
+
+  /* нижняя панель выбора без камеры */
+  #pickerbtn { position: fixed; z-index: 7; right: 14px;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    padding: 9px 14px; border: 1px solid var(--line); border-radius: 24px;
+    background: var(--panel); color: var(--dim); font-size: 13px; cursor: pointer; }
+  #picker { position: fixed; z-index: 8; left: 0; right: 0; bottom: 0;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding: 14px 14px max(14px, env(safe-area-inset-bottom));
+    transform: translateY(105%); transition: transform .3s; backdrop-filter: blur(10px); }
+  #picker.show { transform: none; }
+  #picker .title { color: var(--dim); font-size: 13px; margin-bottom: 10px; }
+  #picker .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  #picker .chip { padding: 8px 13px; border-radius: 20px; border: 1px solid var(--line);
+    background: rgba(255, 255, 255, .05); color: var(--text); font-size: 14px; cursor: pointer; }
+  #picker .chip .sw { display: inline-block; width: 9px; height: 9px;
+    border-radius: 3px; margin-right: 7px; }
+
+  #camerr { position: fixed; z-index: 3; left: 50%; top: 42%; width: 300px;
+    transform: translate(-50%, -50%); text-align: center; color: var(--dim);
+    display: none; }
+  #camerr b { color: var(--text); }
+
+  #toast { position: fixed; z-index: 9; left: 50%; transform: translateX(-50%);
+    top: max(60px, env(safe-area-inset-top)); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px;
+    font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+
+<video id="video" muted playsinline></video>
+<svg id="ar"></svg>
+
+<div id="topbar">
+  <span class="logo">Живой офис</span>
+  <span class="hint">наведи камеру на QR у двери</span>
+  <span class="clock" id="clock"></span>
+</div>
+
+<div id="hintbox">
+  <div class="frame"><i></i><i></i><i></i><i></i></div>
+  <div>Ищу QR-код…</div>
+</div>
+
+<div id="camerr">
+  <p><b>Камера недоступна.</b></p>
+  <p style="margin-top:8px">Открой страницу по localhost или https —
+  либо выбери переговорку вручную кнопкой внизу.</p>
+</div>
+
+<div id="card">
+  <div class="accent"></div>
+  <div class="head"><span class="name"></span><span class="cap"></span></div>
+  <div class="status"><span class="dot"></span><span class="stext"></span></div>
+  <div class="sub"></div>
+  <div class="badges"></div>
+  <div class="next"></div>
+  <div class="tl"></div>
+  <div class="tlcap"><span>9:00</span><span>12:00</span><span>15:00</span><span>19:00</span></div>
+  <div class="summary"></div>
+  <div class="actions"><button class="knock">Постучаться</button></div>
+</div>
+
+<button id="pickerbtn">Без камеры</button>
+<div id="picker">
+  <div class="title">Выбери комнату — покажу её карточку</div>
+  <div class="chips"></div>
+</div>
+
+<div id="toast"></div>
+
+<script src="vendor/jsQR.js"></script>
+<script src="shared/core.js"></script>
+<script>
+/*APP-START*/
+(function () {
+  'use strict';
+  var LO = window.LivingOffice;
+  var engine = LO.createEngine();
+  LO.mountDemoPanel(engine);
+
+  var video = document.getElementById('video');
+  var ar = document.getElementById('ar');
+  var card = document.getElementById('card');
+  var hintbox = document.getElementById('hintbox');
+  var camerr = document.getElementById('camerr');
+  var toast = document.getElementById('toast');
+  var clockEl = document.getElementById('clock');
+
+  var allPlaces = engine.rooms.concat(engine.funzones);
+  function placeById(id) {
+    return allPlaces.find(function (p) { return p.id === id; }) || null;
+  }
+
+  /* ---------- камера + распознавание ---------- */
+
+  var decodeCanvas = document.createElement('canvas');
+  var dctx = decodeCanvas.getContext('2d', { willReadFrequently: true });
+  var haveCamera = false;
+  var frameN = 0;
+
+  var target = null;   // {place, corners(video-space), seenAt}
+  var shown = null;    // текущее место в карточке
+  var lerped = null;   // сглаженная экранная позиция {x, y}
+
+  function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return fail();
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } }, audio: false
+    }).then(function (stream) {
+      video.srcObject = stream;
+      video.play();
+      haveCamera = true;
+    }).catch(fail);
+    function fail() {
+      camerr.style.display = 'block';
+      hintbox.classList.add('off');
+      openPicker();
+    }
+  }
+
+  function parsePayload(text) {
+    var m = String(text).trim().toLowerCase().match(/(?:room:|#)?([a-z][a-z-]+)\s*$/);
+    return m ? placeById(m[1]) : null;
+  }
+
+  /* видео рисуется object-fit:cover — переводим координаты кадра в экранные */
+  function videoToScreen(p) {
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var iw = video.videoWidth, ih = video.videoHeight;
+    var s = Math.max(vw / iw, vh / ih);
+    return { x: p.x * s + (vw - iw * s) / 2, y: p.y * s + (vh - ih * s) / 2 };
+  }
+
+  function scanFrame() {
+    if (haveCamera && video.videoWidth && (frameN++ % 3 === 0)) {
+      var w = 420;
+      var h = Math.round(video.videoHeight * w / video.videoWidth);
+      decodeCanvas.width = w; decodeCanvas.height = h;
+      dctx.drawImage(video, 0, 0, w, h);
+      var img = dctx.getImageData(0, 0, w, h);
+      var res = null;
+      try { res = jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' }); } catch (e) {}
+      if (res && res.data) {
+        var place = parsePayload(res.data);
+        if (place) {
+          var k = video.videoWidth / w;
+          var c = res.location;
+          target = {
+            place: place,
+            corners: [c.topLeftCorner, c.topRightCorner,
+                      c.bottomRightCorner, c.bottomLeftCorner]
+              .map(function (p) { return { x: p.x * k, y: p.y * k }; }),
+            seenAt: performance.now()
+          };
+        }
+      }
+    }
+    render();
+    requestAnimationFrame(scanFrame);
+  }
+
+  /* ---------- позиционирование карточки и рамки ---------- */
+
+  function render() {
+    var now = performance.now();
+    var fresh = target && (now - target.seenAt < 1800);
+
+    if (target && (!shown || shown.id !== target.place.id)) {
+      shown = target.place;
+      fillCard(true);
+    }
+
+    if (fresh) {
+      hintbox.classList.add('off');
+      var pts = target.corners.map(videoToScreen);
+      ar.innerHTML = '<polygon points="' +
+        pts.map(function (p) { return p.x.toFixed(0) + ',' + p.y.toFixed(0); }).join(' ') +
+        '"/>';
+      var cx = (pts[0].x + pts[1].x + pts[2].x + pts[3].x) / 4;
+      var topY = Math.min(pts[0].y, pts[1].y, pts[2].y, pts[3].y);
+      if (!lerped) lerped = { x: cx, y: topY };
+      lerped.x += (cx - lerped.x) * 0.22;
+      lerped.y += (topY - lerped.y) * 0.22;
+      card.classList.remove('docked');
+      card.classList.add('show');
+      card.style.left = Math.max(160, Math.min(window.innerWidth - 160, lerped.x)) + 'px';
+      card.style.top = Math.max(card.offsetHeight + 70, lerped.y) + 'px';
+    } else {
+      ar.innerHTML = '';
+      lerped = null;
+      if (shown) {
+        card.classList.add('docked');   // потеряли код — карточка паркуется снизу
+        card.classList.add('show');
+      }
+      if (haveCamera && !shown) hintbox.classList.remove('off');
+    }
+  }
+
+  /* ---------- содержимое карточки ---------- */
+
+  var els = {
+    accent: card.querySelector('.accent'),
+    name: card.querySelector('.name'),
+    cap: card.querySelector('.cap'),
+    dot: card.querySelector('.dot'),
+    stext: card.querySelector('.stext'),
+    sub: card.querySelector('.sub'),
+    badges: card.querySelector('.badges'),
+    next: card.querySelector('.next'),
+    tl: card.querySelector('.tl'),
+    summary: card.querySelector('.summary'),
+    knock: card.querySelector('.knock')
+  };
+
+  function fillCard(full) {
+    if (!shown) return;
+    var isRoom = !!shown.cap;
+    els.accent.style.background = shown.accent || '#7a86a8';
+    els.name.textContent = (shown.emoji ? shown.emoji + ' ' : '') + shown.name;
+    els.cap.textContent = isRoom
+      ? 'до ' + shown.cap + ' чел · ' + (shown.features.join(' · ') || 'без экрана')
+      : 'фан-зона';
+
+    if (!isRoom) {
+      els.stext.textContent = 'Не бронируется';
+      els.dot.style.background = 'var(--free)';
+      els.sub.textContent = shown.note;
+      els.badges.textContent = '';
+      els.next.textContent = '';
+      els.tl.style.display = 'none';
+      card.querySelector('.tlcap').style.display = 'none';
+      els.summary.textContent = 'Просто приходи, когда свободно 🙂';
+      els.knock.style.display = 'none';
+      return;
+    }
+    els.tl.style.display = '';
+    card.querySelector('.tlcap').style.display = '';
+    els.knock.style.display = '';
+
+    var st = engine.getState(shown.id);
+    var fmt = LO.fmt;
+
+    if (st.status === 'occupied') {
+      els.dot.style.background = 'var(--busy)';
+      els.stext.textContent = 'Идёт «' + st.current.title + '» · до ' + fmt.time(st.current.end);
+      els.sub.textContent = st.current.organizer + ' и ещё ' +
+        Math.max(0, st.current.attendees.length - 1) + ' чел';
+    } else if (st.status === 'awaiting') {
+      var s = Math.ceil(st.deadlineSec);
+      els.dot.style.background = 'var(--wait)';
+      els.stext.innerHTML = 'Бронь ждёт NFC · <span class="timer">' +
+        Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + '</span>';
+      els.sub.textContent = '«' + st.current.title + '» — если никто не придёт до ' +
+        fmt.time(st.deadline) + ', комната освободится';
+    } else {
+      els.dot.style.background = 'var(--free)';
+      els.stext.textContent = 'Свободна ещё ' + fmt.dur(st.freeUntil - engine.now());
+      els.sub.textContent = 'Можно занять прямо сейчас';
+    }
+
+    els.badges.textContent = '';
+    if (st.status === 'free' && st.releasedInfo) {
+      var b = document.createElement('span');
+      b.className = 'badge' + (st.releasedInfo.type === 'noshow' ? ' noshow' : '');
+      b.textContent = st.releasedInfo.type === 'early'
+        ? 'освободили на ' + st.releasedInfo.minutesEarly + ' мин раньше'
+        : 'никто не пришёл — освобождена автоматически';
+      els.badges.appendChild(b);
+    }
+
+    if (st.next) {
+      els.next.innerHTML = 'Дальше: <b>' + fmt.time(st.next.start) + ' — ' +
+        escapeHtml(st.next.title) + '</b>';
+    } else {
+      els.next.textContent = 'Дальше сегодня броней нет';
+    }
+
+    els.summary.textContent = st.summary;
+
+    if (full) {
+      els.tl.innerHTML = '<div class="now"></div>';
+      var wd = engine.workday, span = wd.end - wd.start;
+      st.schedule.forEach(function (e) {
+        var d = document.createElement('div');
+        d.className = 'ev' +
+          (e.released ? ' ghost' : (st.current && e.id === st.current.id ? ' cur' :
+            (e.end < engine.now() ? ' past' : '')));
+        d.style.left = ((e.start - wd.start) / span * 100) + '%';
+        d.style.width = (Math.max(1.5, (e.end - e.start) / span * 100)) + '%';
+        d.title = fmt.time(e.start) + '–' + fmt.time(e.end) + ' ' + e.title;
+        els.tl.appendChild(d);
+      });
+    }
+    var nowEl = els.tl.querySelector('.now');
+    if (nowEl) {
+      var wd2 = engine.workday;
+      nowEl.style.left = Math.min(100, Math.max(0,
+        (engine.now() - wd2.start) / (wd2.end - wd2.start) * 100)) + '%';
+    }
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  els.knock.addEventListener('click', function () {
+    showToast('Постучались в «' + shown.name + '» — отправлено в чат Б24');
+  });
+
+  var toastTimer = null;
+  function showToast(text) {
+    toast.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2600);
+  }
+  engine.on('toast', function (t) { showToast(t.title + ': ' + t.text); });
+
+  /* живое обновление карточки раз в секунду */
+  var lastSec = -1;
+  engine.on('tick', function (t) {
+    var s = Math.floor(t.simSec);
+    if (s !== lastSec) {
+      lastSec = s;
+      clockEl.textContent = LO.fmt.clock(t.simSec);
+      if (card.classList.contains('show')) fillCard(false);
+    }
+  });
+  engine.on('change', function () {
+    if (card.classList.contains('show')) fillCard(true);
+  });
+
+  /* ---------- ручной выбор ---------- */
+
+  var picker = document.getElementById('picker');
+  var pickerbtn = document.getElementById('pickerbtn');
+  function openPicker() { picker.classList.add('show'); }
+  pickerbtn.addEventListener('click', function () {
+    picker.classList.toggle('show');
+  });
+  var chips = picker.querySelector('.chips');
+  allPlaces.forEach(function (p) {
+    var c = document.createElement('button');
+    c.className = 'chip';
+    var sw = document.createElement('span');
+    sw.className = 'sw';
+    sw.style.background = p.accent || '#7a86a8';
+    c.appendChild(sw);
+    c.appendChild(document.createTextNode((p.emoji ? p.emoji + ' ' : '') + p.name));
+    c.addEventListener('click', function () {
+      shown = p;
+      target = null;
+      fillCard(true);
+      card.classList.add('docked');
+      card.classList.add('show');
+      picker.classList.remove('show');
+    });
+    chips.appendChild(c);
+  });
+
+  startCamera();
+  requestAnimationFrame(scanFrame);
+})();
+/*APP-END*/
+</script>

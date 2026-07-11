@@ -1,0 +1,72 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Живой офис · QR-метки на двери</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font: 15px/1.5 -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+    background: #f2f2f5; color: #16181f; padding: 28px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  p.hint { color: #6b7183; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 18px; }
+  .tag { background: #fff; border-radius: 16px; padding: 22px 18px 18px;
+    text-align: center; border: 1px solid #e3e5ec;
+    break-inside: avoid; page-break-inside: avoid; }
+  .tag svg { width: 150px; height: 150px; }
+  .tag .name { font-size: 19px; font-weight: 800; margin-top: 10px; }
+  .tag .accent { width: 44px; height: 5px; border-radius: 3px; margin: 8px auto 0; }
+  .tag .cta { color: #6b7183; font-size: 12.5px; margin-top: 8px; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    p.hint, h1 { display: none; }
+    .grid { gap: 10px; }
+    .tag { border: 1px dashed #bbb; border-radius: 8px; }
+  }
+</style>
+
+<h1>QR-метки на двери</h1>
+<p class="hint">Печатай (Cmd+P) и клей рядом с NFC-меткой. QR ведёт в «QR-тур»:
+наводишь камеру — видишь, что происходит в комнате.</p>
+<div class="grid" id="grid"></div>
+
+<script src="vendor/qrcode.js"></script>
+<script src="shared/core.js"></script>
+<script>
+/*APP-START*/
+(function () {
+  'use strict';
+  var LO = window.LivingOffice;
+  var grid = document.getElementById('grid');
+  var places = LO.ROOMS.concat(LO.FUNZONES);
+
+  places.forEach(function (p) {
+    var qr = qrcode(0, 'M');
+    qr.addData('room:' + p.id);
+    qr.make();
+
+    var tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
+
+    var name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = (p.emoji ? p.emoji + ' ' : '') + p.name;
+    tag.appendChild(name);
+
+    var accent = document.createElement('div');
+    accent.className = 'accent';
+    accent.style.background = p.accent || '#9aa2b8';
+    tag.appendChild(accent);
+
+    var cta = document.createElement('div');
+    cta.className = 'cta';
+    cta.textContent = p.cap
+      ? 'Наведи камеру — узнай, что здесь происходит'
+      : 'Фан-зона: не бронируется, просто приходи';
+    tag.appendChild(cta);
+
+    grid.appendChild(tag);
+  });
+})();
+/*APP-END*/
+</script>
