@@ -42,7 +42,8 @@
   #card.show { opacity: 1; pointer-events: auto; }
   #card.docked { left: 50% !important; top: auto !important;
     bottom: max(14px, env(safe-area-inset-bottom));
-    transform: translate(-50%, 0); transition: opacity .25s, bottom .3s; }
+    transform: translate(-50%, 0); transition: opacity .25s, bottom .3s;
+    max-height: 76vh; overflow-y: auto; }
   #card .head { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 0; }
   #card .name { font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
   #card .cap { color: var(--dim); font-size: 12px; white-space: nowrap; }
@@ -72,12 +73,10 @@
     background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.9); }
   #card .tlcap { display: flex; justify-content: space-between; margin: 0 14px;
     color: var(--dim); font-size: 10px; font-family: ui-monospace, Menlo, monospace; }
-  #card .summary { padding: 8px 14px 0; font-size: 13px; color: var(--dim); }
-  #card .actions { padding: 12px 14px 14px; }
-  #card .knock { width: 100%; padding: 10px 0; border: 0; border-radius: 10px;
-    background: var(--amber); color: #201503; font-weight: 750; font-size: 14px;
-    cursor: pointer; }
-  #card .knock:active { transform: scale(.985); }
+  #card .summary { padding: 8px 14px 14px; font-size: 13px; color: var(--dim); }
+  /* фото комнаты */
+  #card .photo { height: 132px; background: #222; }
+  #card .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   #card .note { padding: 8px 14px 0; font-size: 13.5px; }
 
   /* прицел-подсказка */
@@ -145,6 +144,7 @@
 
 <div id="card">
   <div class="accent"></div>
+  <div class="photo"><img alt=""></div>
   <div class="head"><span class="name"></span><span class="cap"></span></div>
   <div class="status"><span class="dot"></span><span class="stext"></span></div>
   <div class="sub"></div>
@@ -153,7 +153,6 @@
   <div class="tl"></div>
   <div class="tlcap"><span>9:00</span><span>12:00</span><span>15:00</span><span>19:00</span></div>
   <div class="summary"></div>
-  <div class="actions"><button class="knock">Постучаться</button></div>
 </div>
 
 <button id="pickerbtn">Без камеры</button>
@@ -277,15 +276,23 @@
       ar.innerHTML = '<polygon points="' +
         pts.map(function (p) { return p.x.toFixed(0) + ',' + p.y.toFixed(0); }).join(' ') +
         '"/>';
-      var cx = (pts[0].x + pts[1].x + pts[2].x + pts[3].x) / 4;
-      var topY = Math.min(pts[0].y, pts[1].y, pts[2].y, pts[3].y);
-      if (!lerped) lerped = { x: cx, y: topY };
-      lerped.x += (cx - lerped.x) * 0.22;
-      lerped.y += (topY - lerped.y) * 0.22;
-      card.classList.remove('docked');
-      card.classList.add('show');
-      card.style.left = Math.max(160, Math.min(window.innerWidth - 160, lerped.x)) + 'px';
-      card.style.top = Math.max(card.offsetHeight + 70, lerped.y) + 'px';
+      if (window.innerWidth < 760) {
+        // телефон: карточку не таскаем за QR — паркуем снизу целиком,
+        // за код отвечает AR-рамка
+        lerped = null;
+        card.classList.add('docked');
+        card.classList.add('show');
+      } else {
+        var cx = (pts[0].x + pts[1].x + pts[2].x + pts[3].x) / 4;
+        var topY = Math.min(pts[0].y, pts[1].y, pts[2].y, pts[3].y);
+        if (!lerped) lerped = { x: cx, y: topY };
+        lerped.x += (cx - lerped.x) * 0.22;
+        lerped.y += (topY - lerped.y) * 0.22;
+        card.classList.remove('docked');
+        card.classList.add('show');
+        card.style.left = Math.max(160, Math.min(window.innerWidth - 160, lerped.x)) + 'px';
+        card.style.top = Math.max(card.offsetHeight + 70, lerped.y) + 'px';
+      }
     } else {
       ar.innerHTML = '';
       lerped = null;
@@ -301,6 +308,7 @@
 
   var els = {
     accent: card.querySelector('.accent'),
+    img: card.querySelector('.photo img'),
     name: card.querySelector('.name'),
     cap: card.querySelector('.cap'),
     dot: card.querySelector('.dot'),
@@ -309,14 +317,15 @@
     badges: card.querySelector('.badges'),
     next: card.querySelector('.next'),
     tl: card.querySelector('.tl'),
-    summary: card.querySelector('.summary'),
-    knock: card.querySelector('.knock')
+    summary: card.querySelector('.summary')
   };
 
   function fillCard(full) {
     if (!shown) return;
     var isRoom = !!shown.cap;
     els.accent.style.background = shown.accent || '#7a86a8';
+    if (shown.photo && els.img.getAttribute('src') !== shown.photo + '?v=2')
+      els.img.src = shown.photo + '?v=2';  // версия против кэша браузера
     els.name.textContent = (shown.emoji ? shown.emoji + ' ' : '') + shown.name;
     els.cap.textContent = isRoom
       ? 'до ' + shown.cap + ' чел · ' + (shown.features.join(' · ') || 'без экрана')
@@ -331,12 +340,10 @@
       els.tl.style.display = 'none';
       card.querySelector('.tlcap').style.display = 'none';
       els.summary.textContent = 'Просто приходи, когда свободно 🙂';
-      els.knock.style.display = 'none';
       return;
     }
     els.tl.style.display = '';
     card.querySelector('.tlcap').style.display = '';
-    els.knock.style.display = '';
 
     var st = engine.getState(shown.id);
     var fmt = LO.fmt;
@@ -405,10 +412,6 @@
     d.textContent = s;
     return d.innerHTML;
   }
-
-  els.knock.addEventListener('click', function () {
-    showToast('Постучались в «' + shown.name + '» — отправлено в чат Б24');
-  });
 
   var toastTimer = null;
   function showToast(text) {
