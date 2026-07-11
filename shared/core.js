@@ -18,25 +18,63 @@
   var ROOMS = [
     { id: 'zelenaya', name: 'Зелёная', cap: 8, zone: 'dev',
       features: ['Стол на 8'], accent: '#59b93c', photo: 'photos/zelenaya.jpg',
-      rect: { x: 10,   y: 9,    w: 7,   h: 6   }, door: { x: 17,   y: 12 } },
+      rect: { x: 10,   y: 9,    w: 7,   h: 6   }, door: { x: 17,   y: 12 },
+      interior: [
+        { kind: 'table', rect: { x: 11.6, y: 10.7, w: 3.8, h: 2.6 }, seats: [3, 1, 3, 1] }
+      ] },
     { id: 'tushinsky', name: 'Кабинет Тушинского', cap: 6, zone: 'dev',
-      features: ['ТВ'], accent: '#c94fb6', photo: 'photos/tushinsky.jpg',
-      rect: { x: 21.5, y: 1.5,  w: 5.5, h: 8   }, door: { x: 24,   y: 9.5 } },
+      features: ['Стол на 6', 'ТВ'], accent: '#c94fb6', photo: 'photos/tushinsky.jpg',
+      rect: { x: 21.5, y: 1.5,  w: 5.5, h: 8   }, door: { x: 24,   y: 9.5 },
+      interior: [
+        { kind: 'tv', x0: 23, x1: 25.5 },
+        { kind: 'table', rect: { x: 22.9, y: 3.4, w: 2.8, h: 3.6 }, seats: [1, 2, 1, 2] }
+      ] },
     { id: 'krasnaya', name: 'Красная', cap: 3, zone: 'hall',
-      features: ['Диван'], accent: '#e03a4e', photo: 'photos/krasnaya.jpg',
-      rect: { x: 28.3, y: 7.1,  w: 4.5, h: 2.4 }, door: { x: 30.2, y: 9.5 } },
+      features: ['Два кресла'], accent: '#e03a4e', photo: 'photos/krasnaya.jpg',
+      rect: { x: 28.3, y: 7.1,  w: 4.5, h: 2.4 }, door: { x: 30.2, y: 9.5 },
+      interior: [
+        { kind: 'armchair', x: 29.4, y: 8.3, dir: 'e' },
+        { kind: 'armchair', x: 31.7, y: 8.3, dir: 'w' }
+      ] },
     { id: 'golubaya-left', name: 'Голубая левая', cap: 1, zone: 'hall',
       features: ['Кресло'], accent: '#3d6fd8', photo: 'photos/golubaya-left.jpg',
-      rect: { x: 53.7, y: 7.6,  w: 2.2, h: 2.2 }, door: { x: 54.8, y: 9.8 } },
+      rect: { x: 53.7, y: 7.6,  w: 2.2, h: 2.2 }, door: { x: 54.8, y: 9.8 },
+      interior: [{ kind: 'armchair', x: 54.8, y: 8.6, dir: 's' }] },
     { id: 'golubaya-right', name: 'Голубая правая', cap: 1, zone: 'hall',
       features: ['Кресло'], accent: '#3d6fd8', photo: 'photos/golubaya-right.jpg',
-      rect: { x: 56.3, y: 7.6,  w: 2.2, h: 2.2 }, door: { x: 57.4, y: 9.8 } },
+      rect: { x: 56.3, y: 7.6,  w: 2.2, h: 2.2 }, door: { x: 57.4, y: 9.8 },
+      interior: [{ kind: 'armchair', x: 57.4, y: 8.6, dir: 's' }] },
     { id: 'zheltaya', name: 'Жёлтая', cap: 5, zone: 'hall',
-      features: ['ТВ', 'Пуфики'], accent: '#e8c22e', photo: 'photos/zheltaya.jpg',
-      rect: { x: 54,   y: 18.5, w: 4.5, h: 5.5 }, door: { x: 54,   y: 21.2 } },
+      features: ['Стол', 'ТВ'], accent: '#e8c22e', photo: 'photos/zheltaya.jpg',
+      rect: { x: 54,   y: 18.5, w: 4.5, h: 5.5 }, door: { x: 54,   y: 21.2 },
+      interior: [
+        { kind: 'tv', x0: 55.2, x1: 57.4 },
+        { kind: 'table', rect: { x: 55.1, y: 20.2, w: 2.4, h: 2.4 }, seats: [2, 1, 2, 0] }
+      ] },
     { id: 'ryzhikov', name: 'Кабинет Рыжикова', cap: 10, zone: 'qa',
-      features: ['Флипчарт', 'Диван'], accent: '#2fb08a', photo: 'photos/ryzhikov.jpg',
-      rect: { x: 75,   y: 5,    w: 10,  h: 13  }, door: { x: 75,   y: 11 } }
+      features: ['ТВ', 'Диван', 'Велотренажёр'], accent: '#2fb08a', photo: 'photos/ryzhikov.jpg',
+      rect: { x: 75,   y: 5,    w: 10,  h: 13  }, door: { x: 75,   y: 11 },
+      interior: [
+        { kind: 'tv', x0: 77.5, x1: 81 },
+        { kind: 'table', rect: { x: 76.8, y: 7.2, w: 5.4, h: 2.4 }, seats: [3, 0, 3, 0] },
+        { kind: 'armchair', x: 83, y: 8.4, dir: 'w' },
+        { kind: 'sofa', rect: { x: 76.4, y: 14.8, w: 3.2, h: 1.25 } },
+        { kind: 'bike', x: 83.2, y: 15.8 }
+      ] },
+    /* 1 этаж: большой Зал — треть этажа слева */
+    { id: 'zal', name: 'Зал', cap: 40, zone: 'zal', floor: 1,
+      features: ['Проектор', 'Сцена'], accent: '#8a63d2', photo: 'photos/hall.jpg',
+      rect: { x: 1.5, y: 1.5, w: 26, h: 21 }, door: { x: 27.5, y: 12 },
+      interior: [
+        { kind: 'tv', x0: 8, x1: 20 },
+        { kind: 'table', rect: { x: 8, y: 9, w: 12, h: 4 }, seats: [5, 1, 5, 1] }
+      ] }
+  ];
+
+  /* Этажи здания: без поля floor у объекта — 5 этаж (историческое крыло). */
+  var FLOORS = [
+    { num: 5, name: '5 этаж' },
+    { num: 1, name: '1 этаж' }
   ];
 
   /* Фан-зоны — не бронируются, живут на карте для настроения. */
@@ -59,7 +97,8 @@
   var AREAS = [
     { id: 'dev',  name: 'Разработка', x0: 0,    x1: 27.5 },
     { id: 'hall', name: 'Холл',       x0: 27.5, x1: 58.5 },
-    { id: 'qa',   name: 'QA',         x0: 58.5, x1: 86 }
+    { id: 'qa',   name: 'QA',         x0: 58.5, x1: 86 },
+    { id: 'f1-lobby', name: 'Лобби', x0: 28, x1: 86, floor: 1 }
   ];
 
   /* Стены: белые, местами с полигональным рисунком (олень, кит — как в
@@ -72,7 +111,11 @@
     { a: { x: 27.5, y: 0 },  b: { x: 27.5, y: 13 }, h: 40 },
     { a: { x: 27.5, y: 17 }, b: { x: 27.5, y: 24 }, h: 40 },
     { a: { x: 58.5, y: 0 },  b: { x: 58.5, y: 9 },  h: 40 },
-    { a: { x: 58.5, y: 13 }, b: { x: 58.5, y: 24 }, h: 40 }
+    { a: { x: 58.5, y: 13 }, b: { x: 58.5, y: 24 }, h: 40 },
+    /* 1 этаж: периметр без перегородок — Зал сам стеклянный куб */
+    { a: { x: 0, y: 0 }, b: { x: 40, y: 0 }, h: 40, floor: 1 },
+    { a: { x: 42, y: 0 }, b: { x: 86, y: 0 }, h: 40, art: 'whale', floor: 1 },
+    { a: { x: 0, y: 0 }, b: { x: 0, y: 24 }, h: 40, floor: 1 }
   ];
 
   /* Декор холла: стойка ресепшн (дерево + мосс-стена Битрикс24) и лифт. */
@@ -80,7 +123,35 @@
     { id: 'reception', kind: 'reception', name: 'Ресепшн',
       rect: { x: 36, y: 13.5, w: 10, h: 1.6 } },
     { id: 'lift', kind: 'lift', name: 'Лифт',
-      rect: { x: 34, y: 19, w: 9, h: 4.5 } }
+      rect: { x: 34, y: 19, w: 9, h: 4.5 } },
+    /* пуфики холла — низкие мягкие цилиндры разных цветов */
+    { id: 'pouf1', kind: 'pouf', color: '#e8c22e',
+      rect: { x: 30.5, y: 11.5, w: 1.1, h: 1.1 } },
+    { id: 'pouf2', kind: 'pouf', color: '#e05a6e',
+      rect: { x: 32.2, y: 12.1, w: 1.1, h: 1.1 } },
+    { id: 'pouf3', kind: 'pouf', color: '#4a79d8',
+      rect: { x: 35.5, y: 4.2, w: 1.1, h: 1.1 } },
+    { id: 'pouf4', kind: 'pouf', color: '#59b93c',
+      rect: { x: 36.9, y: 3.4, w: 1.1, h: 1.1 } },
+    { id: 'pouf5', kind: 'pouf', color: '#e8c22e',
+      rect: { x: 48.8, y: 11.8, w: 1.1, h: 1.1 } },
+    { id: 'pouf6', kind: 'pouf', color: '#b593d6',
+      rect: { x: 50.3, y: 11.2, w: 1.1, h: 1.1 } },
+    { id: 'pouf7', kind: 'pouf', color: '#e05a6e',
+      rect: { x: 49.6, y: 3.6, w: 1.1, h: 1.1 } },
+    { id: 'pouf8', kind: 'pouf', color: '#4a79d8',
+      rect: { x: 44.6, y: 16.8, w: 1.1, h: 1.1 } },
+    /* 1 этаж: лифт в той же шахте + пуфики лобби */
+    { id: 'lift1', kind: 'lift', name: 'Лифт', floor: 1,
+      rect: { x: 34, y: 19, w: 9, h: 4.5 } },
+    { id: 'f1pouf1', kind: 'pouf', color: '#e8c22e', floor: 1,
+      rect: { x: 46, y: 8, w: 1.1, h: 1.1 } },
+    { id: 'f1pouf2', kind: 'pouf', color: '#e05a6e', floor: 1,
+      rect: { x: 47.6, y: 8.7, w: 1.1, h: 1.1 } },
+    { id: 'f1pouf3', kind: 'pouf', color: '#59b93c', floor: 1,
+      rect: { x: 60, y: 14, w: 1.1, h: 1.1 } },
+    { id: 'f1pouf4', kind: 'pouf', color: '#4a79d8', floor: 1,
+      rect: { x: 72, y: 6.5, w: 1.1, h: 1.1 } }
   ];
 
   /* Рассадка крыла разработки — столы с именами (по наброску,
@@ -143,6 +214,10 @@
       zheltaya: [
         ev('y1', 'Статус-колл', 'Оля К.', ['Оля К.', 'Дима Р.'], 570, 600, { released: 'noshow', releasedAt: 576 }),
         ev('y2', 'Ретро команды', 'Игорь С.', ['Игорь С.', 'Женя Л.'], 1020, 1080, {})
+      ],
+      zal: [
+        ev('za1', 'Общее собрание', 'HR', ['HR', 'Сергей Р.', 'Игорь С.'], 600, 660, { checkedInAt: 601 }),
+        ev('za2', 'Демо продукта: гости', 'Оля К.', ['Оля К.', 'Женя Л.', 'Павел Т.'], 1020, 1110, {})
       ]
     };
   }
@@ -541,6 +616,7 @@
     DECOR: DECOR,
     DESKS: DESKS,
     AREAS: AREAS,
+    FLOORS: FLOORS,
     GRACE_MIN: GRACE_MIN,
     WORKDAY: WORKDAY,
     createEngine: createEngine,

@@ -61,27 +61,29 @@
   .room .chip-bg { transition: fill .3s; }
   .flash { animation: flash 1.1s ease-out forwards; transform-origin: center; pointer-events: none; }
   @keyframes flash { from { opacity: .9; } to { opacity: 0; transform: scale(2.6); } }
-  .av { transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
   .funzone { cursor: pointer; }
   .me-pin { animation: mepulse 2s ease-in-out infinite; transform-box: fill-box;
     transform-origin: center; }
   @keyframes mepulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
 
-  /* ---------- лента (десктоп) ---------- */
-  #feedbox { position: fixed; z-index: 15; right: 16px; top: 86px; width: 300px;
-    max-height: calc(100vh - 120px); display: flex; flex-direction: column;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
-    backdrop-filter: blur(8px); overflow: hidden; }
-  #feedbox h3 { padding: 12px 16px 8px; font-size: 12px; font-weight: 700;
-    letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
-  #feed { list-style: none; overflow-y: auto; padding: 0 8px 10px; }
-  #feed li { display: flex; gap: 9px; padding: 8px; border-radius: 10px; font-size: 13px; }
-  #feed li.fresh { animation: slidein .4s ease-out; background: rgba(245, 166, 35, .08); }
-  @keyframes slidein { from { opacity: 0; transform: translateX(24px); } }
-  #feed .t { font-family: ui-monospace, Menlo, monospace; color: var(--dim);
-    font-size: 12px; padding-top: 1px; white-space: nowrap; }
-  #feed .k { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
-  #feedbtn { display: none; }
+  /* ---------- этажи: активный резкий, остальные — призраки ---------- */
+  .floorg { transition: opacity .45s ease, filter .45s ease; }
+  .floorg.ghost { opacity: .35; filter: blur(4px) brightness(.7) saturate(.6);
+    pointer-events: none; }
+
+  /* переключалка этажей — как в ТЦ на картах */
+  #floors { position: fixed; z-index: 16; right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 4px; padding: 5px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    backdrop-filter: blur(10px); }
+  #floors .cap { text-align: center; font-size: 9.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--dim); padding: 2px 0 1px; }
+  #floors button { width: 42px; height: 40px; border: 0; border-radius: 10px;
+    background: transparent; color: var(--dim); font: inherit; font-size: 15px;
+    font-weight: 750; cursor: pointer; transition: background .2s, color .2s; }
+  #floors button:hover { background: rgba(255, 255, 255, .07); color: var(--text); }
+  #floors button.on { background: #f5c542; color: #201503; }
 
   /* ---------- карточка ---------- */
   #backdrop { position: fixed; inset: 0; z-index: 24; background: rgba(5, 6, 10, .45);
@@ -158,18 +160,6 @@
     #qrlink { order: 3; padding: 6px 11px; font-size: 12px; }
     #saved { order: 4; font-size: 11.5px; padding: 5px 10px; }
     #legend { order: 5; flex-basis: 100%; }
-    #feedbox { display: none; }
-    #feedbtn { display: inline-flex; align-items: center; gap: 7px; position: fixed;
-      z-index: 18; left: 12px; bottom: max(14px, env(safe-area-inset-bottom));
-      padding: 10px 15px; border-radius: 24px; background: var(--panel);
-      border: 1px solid var(--line); color: var(--dim); font-size: 13px;
-      backdrop-filter: blur(8px); }
-    #feedbtn .n { min-width: 20px; height: 20px; border-radius: 10px; background: var(--amber);
-      color: #201503; font-weight: 750; font-size: 12px; line-height: 20px; text-align: center; }
-    #feedbox.sheet { display: flex; position: fixed; z-index: 26; left: 0; right: 0;
-      top: auto; bottom: 0; width: auto; max-height: 62vh;
-      border-radius: 20px 20px 0 0; border-bottom: 0;
-      padding-bottom: env(safe-area-inset-bottom); }
     #card { top: auto; right: 0; left: 0; bottom: 0; width: auto;
       max-height: 78vh; border-radius: 22px 22px 0 0; border-bottom: 0;
       transform: translateY(30px); padding-bottom: env(safe-area-inset-bottom); }
@@ -184,7 +174,7 @@
 <div id="stage"><svg id="map"></svg></div>
 
 <div id="topbar">
-  <div class="logo">Живой офис<small>крыло · 3 этаж · Битрикс24</small></div>
+  <div class="logo">Живой офис<small>крыло · <span id="floorlabel">5 этаж</span> · Битрикс24</small></div>
   <div id="legend">
     <span class="pill"><i style="background:var(--free)"></i>свободна</span>
     <span class="pill"><i style="background:var(--amber)"></i>ждёт NFC</span>
@@ -199,11 +189,7 @@
   <span id="clock">--:--:--</span>
 </div>
 
-<div id="feedbox">
-  <h3>Лента этажа</h3>
-  <ul id="feed"></ul>
-</div>
-<button id="feedbtn">Лента <span class="n">0</span></button>
+<div id="floors"><div class="cap">этаж</div></div>
 
 <div id="backdrop"></div>
 <div id="card">
@@ -245,6 +231,7 @@
   var S = 30, H = 52, FUN_H = 10;
   var svg = document.getElementById('map');
   var NS = 'http://www.w3.org/2000/svg';
+  var activeFloor = 5;   // текущий этаж на карте
 
   /* ---------- сборка сцены ---------- */
 
@@ -267,7 +254,11 @@
       '<radialGradient id="auraG"><stop offset="55%" stop-color="#f5a623" stop-opacity=".38"/>' +
       '<stop offset="100%" stop-color="#f5a623" stop-opacity="0"/></radialGradient>' +
       '<filter id="soft" x="-40%" y="-40%" width="180%" height="180%">' +
-      '<feGaussianBlur stdDeviation="6"/></filter>';
+      '<feGaussianBlur stdDeviation="6"/></filter>' +
+      '<linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#b5ddf8"/>' +
+      '<stop offset="70%" stop-color="#8ec4ee"/>' +
+      '<stop offset="100%" stop-color="#7ab4e4"/></linearGradient>';
 
     var b = iso.bounds([LO.FLOOR], S, H);
     var pad = 70;
@@ -285,6 +276,31 @@
     applyView();
 
     var world = el('g', { id: 'world' }, svg);
+
+    // этажи стопкой: неактивные рисуем первыми (призраки), активный — поверх
+    LO.FLOORS.slice().sort(function (a, b2) {
+      return (a.num === activeFloor ? 1 : 0) - (b2.num === activeFloor ? 1 : 0);
+    }).forEach(function (fl) {
+      var gF = el('g', {
+        'class': 'floorg' + (fl.num === activeFloor ? '' : ' ghost'),
+        id: 'floorg-' + fl.num,
+        transform: 'translate(0,' + floorOffset(fl.num) + ')'
+      }, world);
+      buildFloor(gF, fl.num);
+    });
+  }
+
+  /* экранный сдвиг этажа: верхний в списке FLOORS — выше на экране */
+  var FLOOR_GAP = 340;
+  function floorOffset(num) {
+    var idx = 0;
+    LO.FLOORS.forEach(function (fl, k) { if (fl.num === num) idx = k; });
+    return idx * FLOOR_GAP;
+  }
+  function floorOf(o) { return o.floor || 5; }
+
+  function buildFloor(world, floorNum) {
+    function mine(o) { return floorOf(o) === floorNum; }
 
     var f = LO.FLOOR;
 
@@ -319,7 +335,7 @@
       'stroke-width': 1.4 }, world);
 
     // подписи зон на полу
-    LO.AREAS.forEach(function (a) {
+    LO.AREAS.filter(mine).forEach(function (a) {
       var c = iso.project((a.x0 + a.x1) / 2, 22.4, S);
       var t = el('text', { x: c.x, y: c.y, 'text-anchor': 'middle', 'font-size': 34,
         'font-weight': 800, fill: 'rgba(232,235,245,.07)', 'letter-spacing': 8 }, world);
@@ -334,12 +350,12 @@
       items.push({ phase: zonePhase(rect.x + (rect.w || 0) / 2),
         sub: rect.x + rect.y, f: fn });
     }
-    LO.ROOMS.forEach(function (r) { pushObj(r.rect, function () { buildRoom(world, r); }); });
-    LO.FUNZONES.forEach(function (z) { pushObj(z.rect, function () { buildFun(world, z); }); });
-    LO.DECOR.forEach(function (d) { pushObj(d.rect, function () { buildDecor(world, d); }); });
-    LO.DESKS.forEach(function (d) { pushObj({ x: d.x, y: d.y, w: d.cols * 1.6 },
+    LO.ROOMS.filter(mine).forEach(function (r) { pushObj(r.rect, function () { buildRoom(world, r); }); });
+    LO.FUNZONES.filter(mine).forEach(function (z) { pushObj(z.rect, function () { buildFun(world, z); }); });
+    LO.DECOR.filter(mine).forEach(function (d) { pushObj(d.rect, function () { buildDecor(world, d); }); });
+    LO.DESKS.filter(mine).forEach(function (d) { pushObj({ x: d.x, y: d.y, w: d.cols * 1.6 },
       function () { buildDeskCluster(world, d); }); });
-    LO.WALLS.forEach(function (w) {
+    LO.WALLS.filter(mine).forEach(function (w) {
       var backWall = (w.a.y === 0 && w.b.y === 0) || (w.a.x === 0 && w.b.x === 0);
       var phase = backWall ? 0 : (w.a.x < 40 ? 2 : 4);
       var dx = w.b.x - w.a.x, dy = w.b.y - w.a.y;
@@ -374,6 +390,28 @@
       fill: horizontal ? '#8e94a8' : '#7c8296', 'fill-opacity': .96 }, parent);
     el('line', { x1: A.x, y1: A.y - h, x2: B.x, y2: B.y - h,
       stroke: '#c9cede', 'stroke-width': 1.6 }, parent);
+
+    // окна с дневным небом — верх дальней стены (y=0), кроме чанков с рисунком
+    if (!art && a.y < 0.01 && b.y < 0.01) {
+      function P(t, up) {
+        return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t - up };
+      }
+      var TOP = h - 5, BOT = 16;
+      el('polygon', { points: iso.pts([P(.14, TOP), P(.86, TOP), P(.86, BOT), P(.14, BOT)]),
+        fill: 'url(#skyG)', stroke: '#e8eef8', 'stroke-width': 1.6 }, parent);
+      // облака — по-разному в шахматном порядке чанков
+      var alt = Math.floor(a.x / 3) % 2;
+      var c1 = P(alt ? .32 : .6, TOP - 7), c2 = P(alt ? .66 : .34, BOT + 6);
+      el('ellipse', { cx: c1.x, cy: c1.y, rx: 6, ry: 2, fill: '#fff', 'fill-opacity': .85 }, parent);
+      el('ellipse', { cx: c2.x, cy: c2.y, rx: 4, ry: 1.5, fill: '#fff', 'fill-opacity': .7 }, parent);
+      // рамы: вертикальный импост и горизонтальная перекладина
+      var m0 = P(.5, TOP), m1 = P(.5, BOT);
+      el('line', { x1: m0.x, y1: m0.y, x2: m1.x, y2: m1.y,
+        stroke: '#e8eef8', 'stroke-width': 1.2 }, parent);
+      var mid = (TOP + BOT) / 2;
+      el('line', { x1: P(.14, mid).x, y1: P(.14, mid).y, x2: P(.86, mid).x, y2: P(.86, mid).y,
+        stroke: '#e8eef8', 'stroke-width': 1 }, parent);
+    }
     if (art) {
       var pal = ART[art] || ART.deer;
       var mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2 - h * 0.52;
@@ -657,21 +695,105 @@
   /* ресепшн (дерево + мосс-стена Битрикс24) и лифт */
   function buildDecor(parent, d) {
     var c = iso.center(d.rect, S);
+    if (d.kind === 'pouf') {
+      // низкий мягкий цилиндр: тень → бочок → крышка
+      var prx = (d.rect.w + d.rect.h) * S * .27, pry = prx * .5, PH = 9;
+      el('ellipse', { cx: c.x, cy: c.y + 2, rx: prx * 1.08, ry: pry,
+        fill: 'rgba(0,0,0,.3)' }, parent);
+      el('ellipse', { cx: c.x, cy: c.y, rx: prx, ry: pry,
+        fill: shade(d.color, .62) }, parent);
+      el('rect', { x: c.x - prx, y: c.y - PH, width: prx * 2, height: PH,
+        fill: shade(d.color, .72) }, parent);
+      el('ellipse', { cx: c.x, cy: c.y - PH, rx: prx, ry: pry,
+        fill: d.color, stroke: shade(d.color, .5), 'stroke-width': .8 }, parent);
+      // шов-утяжка по центру крышки
+      el('ellipse', { cx: c.x, cy: c.y - PH, rx: prx * .45, ry: pry * .45,
+        fill: 'none', stroke: shade(d.color, .78), 'stroke-width': .7 }, parent);
+      return;
+    }
     if (d.kind === 'reception') {
+      /* по фото IMG_4888: мосс-стена с трек-подсветкой, светлая стойка-волна
+         из ламелей, подвесные диски, огнетушитель и мелочи на стойке */
+      var WH = 36;
       var wa = { x: d.rect.x - 0.3, y: d.rect.y - 0.4 },
           wb = { x: d.rect.x + d.rect.w + 0.3, y: d.rect.y - 0.4 };
       var WA = iso.project(wa.x, wa.y, S), WB = iso.project(wb.x, wb.y, S);
-      el('polygon', { points: iso.pts([
-        { x: WA.x, y: WA.y - 34 }, { x: WB.x, y: WB.y - 34 }, WB, WA]),
-        fill: '#2c5535' }, parent);
-      var bt = el('text', { x: (WA.x + WB.x) / 2, y: (WA.y + WB.y) / 2 - 18,
-        'text-anchor': 'middle', 'font-size': 10, 'font-weight': 750,
-        fill: '#dff0e2', 'letter-spacing': 1 }, parent);
+      function W(t2, up) {
+        return { x: WA.x + (WB.x - WA.x) * t2, y: WA.y + (WB.y - WA.y) * t2 - up };
+      }
+      // мосс-стена: тёмная основа + «кочки» мха в четырёх тонах
+      el('polygon', { points: iso.pts([W(0, WH), W(1, WH), W(1, 0), W(0, 0)]),
+        fill: '#24462b' }, parent);
+      var mossTones = ['#2c5535', '#346340', '#1e3d25', '#3a7046'];
+      for (var mi = 0; mi < 60; mi++) {
+        var mp = W((mi * 37 % 97) / 97, 4 + (mi * 13 % 29));
+        el('ellipse', { cx: mp.x, cy: mp.y, rx: 2.6 + (mi * 7 % 5),
+          ry: 1.8 + (mi * 11 % 4) * .5,
+          fill: mossTones[mi % 4], 'fill-opacity': .9 }, parent);
+      }
+      // трек со споттами — конусы света по мху
+      el('line', { x1: W(.08, WH + 4).x, y1: W(.08, WH + 4).y,
+        x2: W(.92, WH + 4).x, y2: W(.92, WH + 4).y,
+        stroke: '#1a1e28', 'stroke-width': 2 }, parent);
+      [.2, .5, .8].forEach(function (lt) {
+        var lp = W(lt, WH + 2);
+        el('circle', { cx: lp.x, cy: lp.y, r: 2.4, fill: '#12151d',
+          stroke: '#3a4152', 'stroke-width': .8 }, parent);
+        el('polygon', { points: iso.pts([W(lt - .02, WH), W(lt + .02, WH),
+          W(lt + .09, WH * .3), W(lt - .09, WH * .3)]),
+          fill: 'rgba(214, 255, 176, .12)' }, parent);
+        el('ellipse', { cx: W(lt, WH * .68).x, cy: W(lt, WH * .68).y,
+          rx: 7, ry: 4.5, fill: 'rgba(198, 245, 160, .2)' }, parent);
+      });
+      // логотип на мху — справа, как в жизни
+      var bt = el('text', { x: W(.78, WH * .55).x, y: W(.78, WH * .55).y,
+        'text-anchor': 'middle', 'font-size': 7.5, 'font-weight': 750,
+        fill: '#d6efcf', 'letter-spacing': .8 }, parent);
       bt.textContent = 'Битрикс24';
+      // огнетушитель у левого края
+      var ep = W(.035, 0);
+      el('rect', { x: ep.x - 1.6, y: ep.y - 9, width: 3.2, height: 9, rx: 1.4,
+        fill: '#c23b30' }, parent);
+      el('line', { x1: ep.x, y1: ep.y - 9, x2: ep.x, y2: ep.y - 11,
+        stroke: '#1a1e28', 'stroke-width': 1.4 }, parent);
+      // подвесные светильники-диски: белые и тёмные, на разной высоте
+      [[.3, 30, 6.5, '#eef1f7'], [.45, 24, 4.5, '#2c3242'],
+       [.62, 33, 8, '#f4f6fa'], [.75, 26, 5, '#39414f']].forEach(function (dk) {
+        var dp = W(dk[0], 0), dy = dp.y + 10;
+        el('line', { x1: dp.x, y1: dy - WH - 14, x2: dp.x, y2: dy - dk[1],
+          stroke: 'rgba(200, 208, 226, .5)', 'stroke-width': .7 }, parent);
+        el('ellipse', { cx: dp.x, cy: dy - dk[1], rx: dk[2], ry: dk[2] * .38,
+          fill: dk[3], stroke: '#12151d', 'stroke-width': .6 }, parent);
+      });
+      // стойка: светлое дерево, ламельный фасад с волной
       var p = iso.prism(d.rect, S, 13);
-      el('polygon', { points: iso.pts(p.right), fill: '#96793f' }, parent);
-      el('polygon', { points: iso.pts(p.front), fill: '#b08e55' }, parent);
-      el('polygon', { points: iso.pts(p.top), fill: '#c9a86a' }, parent);
+      el('polygon', { points: iso.pts(p.right), fill: '#b5a075' }, parent);
+      el('polygon', { points: iso.pts(p.front), fill: '#cbb68d' }, parent);
+      var F0 = p.front[0], F1 = p.front[1], B0 = p.front[3], B1 = p.front[2];
+      var LN = 34;
+      for (var li = 1; li < LN; li++) {
+        var ft = li / LN;
+        var wv = Math.sin(ft * Math.PI * 3 + 1) * 1.5;
+        el('line', {
+          x1: F0.x + (F1.x - F0.x) * ft, y1: F0.y + (F1.y - F0.y) * ft + 1 + wv * .4,
+          x2: B0.x + (B1.x - B0.x) * ft, y2: B0.y + (B1.y - B0.y) * ft + wv,
+          stroke: li % 2 ? '#dcc99f' : '#a8946b', 'stroke-width': 1.5,
+          'stroke-opacity': .85 }, parent);
+      }
+      el('polygon', { points: iso.pts(p.top), fill: '#e0d2ab',
+        stroke: '#8d7a52', 'stroke-width': .7, 'stroke-opacity': .6 }, parent);
+      // цветы в вазе и бутылки воды на стойке
+      var vz = iso.project(d.rect.x + d.rect.w * .82, d.rect.y + d.rect.h * .4, S);
+      el('line', { x1: vz.x, y1: vz.y - 13, x2: vz.x, y2: vz.y - 17,
+        stroke: '#6e5a3d', 'stroke-width': 1.2 }, parent);
+      el('ellipse', { cx: vz.x, cy: vz.y - 19, rx: 4, ry: 2.6, fill: '#3f7d4a' }, parent);
+      el('circle', { cx: vz.x - 2, cy: vz.y - 20, r: 1, fill: '#e58fb1' }, parent);
+      el('circle', { cx: vz.x + 2.2, cy: vz.y - 19, r: 1, fill: '#f2dc6b' }, parent);
+      for (var bi = 0; bi < 3; bi++) {
+        var bp = iso.project(d.rect.x + d.rect.w * (.38 + bi * .05), d.rect.y + d.rect.h * .35, S);
+        el('rect', { x: bp.x - 1, y: bp.y - 18, width: 2, height: 5.5, rx: 1,
+          fill: 'rgba(168, 214, 246, .85)' }, parent);
+      }
       var t = el('text', { x: c.x, y: c.y + 18, 'text-anchor': 'middle',
         'font-size': 9.5, fill: '#8b93ab', 'font-weight': 650,
         'paint-order': 'stroke', stroke: 'rgba(8,10,16,.85)', 'stroke-width': 2.5 }, parent);
@@ -696,6 +818,140 @@
     return 'rgb(' + r + ',' + g + ',' + bl + ')';
   }
 
+  /* ---------- интерьер переговорок: рисуется до стекла, просвечивает ---------- */
+
+  var GREY  = { top: '#9aa0b2', side: '#7a8194', dark: '#697083' };
+  var BEIGE = { top: '#c8b393', side: '#a8946f', dark: '#96825e' };
+
+  /* коробка-призма для мебели */
+  function furnBox(parent, rr, h, cols) {
+    var p = iso.prism(rr, S, h);
+    el('polygon', { points: iso.pts(p.right), fill: cols.side }, parent);
+    el('polygon', { points: iso.pts(p.front), fill: cols.dark }, parent);
+    el('polygon', { points: iso.pts(p.top), fill: cols.top,
+      stroke: 'rgba(20,24,34,.4)', 'stroke-width': .5 }, parent);
+  }
+
+  /* чёрное офисное кресло; dir — куда «смотрит» (n/s/e/w) */
+  function officeChair(parent, gx, gy, dir) {
+    var off = { n: [0, .3], s: [0, -.3], e: [-.3, 0], w: [.3, 0] }[dir] || [0, .3];
+    var seat = iso.project(gx, gy, S),
+        back = iso.project(gx + off[0], gy + off[1], S);
+    el('ellipse', { cx: seat.x, cy: seat.y + 1, rx: 6.5, ry: 3.1, fill: '#12141c' }, parent);
+    el('polygon', { points: iso.pts([
+      { x: back.x - 4.5, y: back.y - 7 }, { x: back.x + 4.5, y: back.y - 7 },
+      { x: back.x + 4,   y: back.y - 20 }, { x: back.x - 4, y: back.y - 20 }]),
+      fill: '#16181f', stroke: '#2c3242', 'stroke-width': .7 }, parent);
+    el('line', { x1: seat.x, y1: seat.y, x2: seat.x, y2: seat.y - 8,
+      stroke: '#2c3242', 'stroke-width': 2 }, parent);
+    el('ellipse', { cx: seat.x, cy: seat.y - 8, rx: 6.5, ry: 3.4,
+      fill: '#16181f', stroke: '#2c3242', 'stroke-width': .7 }, parent);
+  }
+
+  /* стол переговорки + офисные стулья вокруг; seats = [N,E,S,W] */
+  function meetingTable(parent, t) {
+    var r = t.rect, s = t.seats || [0, 0, 0, 0], G = .62, i;
+    for (i = 0; i < s[0]; i++)
+      officeChair(parent, r.x + r.w * (i + 1) / (s[0] + 1), r.y - G, 's');
+    for (i = 0; i < s[3]; i++)
+      officeChair(parent, r.x - G, r.y + r.h * (i + 1) / (s[3] + 1), 'e');
+    furnBox(parent, r, 13, BEIGE);
+    for (i = 0; i < s[1]; i++)
+      officeChair(parent, r.x + r.w + G, r.y + r.h * (i + 1) / (s[1] + 1), 'w');
+    for (i = 0; i < s[2]; i++)
+      officeChair(parent, r.x + r.w * (i + 1) / (s[2] + 1), r.y + r.h + G, 'n');
+  }
+
+  /* серое мягкое кресло; dir — куда «смотрит» */
+  function armchair(parent, a) {
+    var x = a.x, y = a.y;
+    var seatR = { x: x - .42, y: y - .42, w: .84, h: .84 };
+    var backR = {
+      n: { x: x - .5, y: y + .28, w: 1, h: .3 },
+      s: { x: x - .5, y: y - .58, w: 1, h: .3 },
+      e: { x: x - .58, y: y - .5, w: .3, h: 1 },
+      w: { x: x + .28, y: y - .5, w: .3, h: 1 }
+    }[a.dir] || { x: x - .5, y: y - .58, w: 1, h: .3 };
+    var vertical = a.dir === 'e' || a.dir === 'w';
+    var armA = vertical
+      ? { x: x - .5, y: y - .58, w: 1, h: .26 }
+      : { x: x - .58, y: y - .5, w: .26, h: 1 };
+    var armB = vertical
+      ? { x: x - .5, y: y + .32, w: 1, h: .26 }
+      : { x: x + .32, y: y - .5, w: .26, h: 1 };
+    var sh = iso.project(x, y, S);
+    el('ellipse', { cx: sh.x, cy: sh.y + 3, rx: 16, ry: 7.5, fill: 'rgba(0,0,0,.28)' }, parent);
+    // painter: части дальше по x+y рисуем позже, чтобы правильно перекрывались
+    var parts = [
+      { r: backR, h: 20 }, { r: armA, h: 13 }, { r: armB, h: 13 }, { r: seatR, h: 8 }
+    ];
+    parts.sort(function (p1, p2) {
+      return (p1.r.x + p1.r.w / 2 + p1.r.y + p1.r.h / 2) -
+             (p2.r.x + p2.r.w / 2 + p2.r.y + p2.r.h / 2);
+    });
+    parts.forEach(function (p) { furnBox(parent, p.r, p.h, GREY); });
+  }
+
+  /* диван: спинка на севере, смотрит на юг */
+  function buildSofa(parent, sf) {
+    var r = sf.rect, c = iso.center(r, S);
+    el('ellipse', { cx: c.x, cy: c.y + 3, rx: (r.w + r.h) * S * .33,
+      ry: (r.w + r.h) * S * .15, fill: 'rgba(0,0,0,.28)' }, parent);
+    furnBox(parent, { x: r.x, y: r.y - .28, w: r.w, h: .34 }, 19, GREY);
+    furnBox(parent, { x: r.x - .26, y: r.y - .28, w: .3, h: r.h + .28 }, 13, GREY);
+    furnBox(parent, { x: r.x + .06, y: r.y + .02, w: r.w - .12, h: r.h }, 9, GREY);
+    furnBox(parent, { x: r.x + r.w - .04, y: r.y - .28, w: .3, h: r.h + .28 }, 13, GREY);
+    for (var k = 1; k < 3; k++) {
+      var q0 = iso.project(r.x + r.w * k / 3, r.y, S),
+          q1 = iso.project(r.x + r.w * k / 3, r.y + r.h, S);
+      el('line', { x1: q0.x, y1: q0.y - 9, x2: q1.x, y2: q1.y - 9,
+        stroke: 'rgba(20,24,34,.35)', 'stroke-width': .8 }, parent);
+    }
+  }
+
+  /* ТВ-панель у дальней стены комнаты (вдоль кромки y) */
+  function tvPanel(parent, room, t) {
+    var y = room.rect.y + .1;
+    var A = iso.project(t.x0, y, S), B = iso.project(t.x1, y, S);
+    var TOP = 34, BOT = 15;
+    function P(t2, up) { return { x: A.x + (B.x - A.x) * t2, y: A.y + (B.y - A.y) * t2 - up }; }
+    el('polygon', { points: iso.pts([P(0, TOP), P(1, TOP), P(1, BOT), P(0, BOT)]),
+      fill: '#12151d', stroke: '#2c3242', 'stroke-width': 1 }, parent);
+    el('polygon', { points: iso.pts([P(.05, TOP - 2), P(.95, TOP - 2), P(.95, BOT + 2), P(.05, BOT + 2)]),
+      fill: '#24406b' }, parent);
+    el('line', { x1: P(.15, TOP - 5).x, y1: P(.15, TOP - 5).y,
+      x2: P(.45, TOP - 5).x, y2: P(.45, TOP - 5).y,
+      stroke: 'rgba(255,255,255,.35)', 'stroke-width': 1.2 }, parent);
+  }
+
+  /* велотренажёр — пасхалка кабинета директора */
+  function buildBike(parent, b) {
+    var q = iso.project(b.x, b.y, S);
+    el('ellipse', { cx: q.x, cy: q.y + 2, rx: 13, ry: 5, fill: 'rgba(0,0,0,.28)' }, parent);
+    el('line', { x1: q.x - 10, y1: q.y, x2: q.x + 8, y2: q.y - 4,
+      stroke: '#2c3242', 'stroke-width': 2.5 }, parent);
+    el('circle', { cx: q.x - 6, cy: q.y - 8, r: 6, fill: '#1a1e2a',
+      stroke: '#3a4152', 'stroke-width': 1.5 }, parent);
+    el('circle', { cx: q.x - 6, cy: q.y - 8, r: 2, fill: '#3a4152' }, parent);
+    el('line', { x1: q.x - 6, y1: q.y - 8, x2: q.x + 6, y2: q.y - 18,
+      stroke: '#39415a', 'stroke-width': 2.5 }, parent);
+    el('line', { x1: q.x - 6, y1: q.y - 8, x2: q.x - 9, y2: q.y - 21,
+      stroke: '#39415a', 'stroke-width': 2.5 }, parent);
+    el('line', { x1: q.x - 13, y1: q.y - 23, x2: q.x - 5, y2: q.y - 22,
+      stroke: '#e0475a', 'stroke-width': 2.2, 'stroke-linecap': 'round' }, parent);
+    el('ellipse', { cx: q.x + 6, cy: q.y - 19, rx: 3.5, ry: 1.6, fill: '#16181f' }, parent);
+  }
+
+  function buildInterior(g, r) {
+    (r.interior || []).forEach(function (it) {
+      if (it.kind === 'table') meetingTable(g, it);
+      else if (it.kind === 'armchair') armchair(g, it);
+      else if (it.kind === 'sofa') buildSofa(g, it);
+      else if (it.kind === 'tv') tvPanel(g, r, it);
+      else if (it.kind === 'bike') buildBike(g, it);
+    });
+  }
+
   function buildRoom(parent, r) {
     var p = iso.prism(r.rect, S, H);
     var c = iso.center(r.rect, S);
@@ -713,6 +969,9 @@
     el('ellipse', { 'class': 'glowpool', cx: c.x, cy: c.y + 6, rx: rx * .92, ry: rx * .46,
       fill: 'url(#pool)', filter: 'url(#soft)' }, g);
 
+    // мебель внутри — до граней куба, чтобы просвечивала сквозь стекло
+    buildInterior(g, r);
+
     // стеклянный куб
     el('polygon', { points: iso.pts(p.right), fill: shade(r.accent, .55),
       'fill-opacity': .5, stroke: r.accent, 'stroke-opacity': .5, 'stroke-width': 1 }, g);
@@ -721,9 +980,6 @@
     buildDoor(g, r);
     el('polygon', { 'class': 'top', points: iso.pts(p.top), fill: r.accent,
       'fill-opacity': .26, stroke: r.accent, 'stroke-opacity': .95, 'stroke-width': 1.6 }, g);
-
-    // аватарки на крыше
-    el('g', { 'class': 'avs' }, g);
 
     // подпись: большие — на крыше, маленькие будки — сбоку слева, остальные снизу
     var area = r.rect.w * r.rect.h;
@@ -841,26 +1097,6 @@
       txt.textContent = st.next ? 'до ' + fmt.time(st.next.start) : 'свободна';
       dot.setAttribute('fill', '#35c56d');
       bg.setAttribute('stroke', '#262b3d');
-    }
-
-    // аватарки
-    var avs = g.querySelector('.avs');
-    var want = st.status === 'occupied' ? st.occupants : [];
-    if (force || avs.childNodes.length !== want.length * 2) {
-      avs.textContent = '';
-      var r = LO.ROOMS.find(function (x) { return x.id === id; });
-      var c = iso.center(r.rect, S);
-      want.slice(0, 6).forEach(function (name, i2) {
-        var ax = c.x + (i2 - (Math.min(want.length, 6) - 1) / 2) * 26;
-        var ay = c.y - H - 42 + (i2 % 2) * 4;
-        var av = el('g', { 'class': 'av' }, avs);
-        el('circle', { cx: ax, cy: ay, r: 11,
-          fill: 'hsl(' + fmt.hue(name) + ' 45% 42%)', stroke: '#0b0d13',
-          'stroke-width': 2 }, av);
-        var t = el('text', { x: ax, y: ay + 3.6, 'text-anchor': 'middle',
-          'font-size': 9, 'font-weight': 700, fill: '#fff' }, av);
-        t.textContent = fmt.initials(name);
-      });
     }
   }
 
@@ -1076,42 +1312,6 @@
     }
   }
 
-  /* ---------- лента ---------- */
-
-  var feedUl = document.getElementById('feed');
-  var feedbox = document.getElementById('feedbox');
-  var feedbtn = document.getElementById('feedbtn');
-  var feedCount = 0;
-
-  function feedDot(kind) {
-    return kind === 'release-noshow' ? 'var(--amber)' :
-           kind === 'release-early' ? 'var(--free)' :
-           kind === 'checkin' ? 'var(--warm)' : 'var(--dim)';
-  }
-  function addFeed(entry, fresh) {
-    var li = document.createElement('li');
-    if (fresh) li.className = 'fresh';
-    var k = document.createElement('span');
-    k.className = 'k'; k.style.background = feedDot(entry.kind);
-    var t = document.createElement('span');
-    t.className = 't'; t.textContent = fmt.time(entry.time);
-    var x = document.createElement('span');
-    x.textContent = entry.text;
-    li.appendChild(k); li.appendChild(t); li.appendChild(x);
-    feedUl.insertBefore(li, feedUl.firstChild);
-    while (feedUl.childNodes.length > 30) feedUl.removeChild(feedUl.lastChild);
-    feedCount++;
-    feedbtn.querySelector('.n').textContent = feedCount;
-  }
-  function renderFeed() {
-    feedUl.textContent = '';
-    feedCount = 0;
-    engine.getFeed().slice().reverse().forEach(function (e) { addFeed(e, false); });
-  }
-  feedbtn.addEventListener('click', function () {
-    feedbox.classList.toggle('sheet');
-  });
-
   /* ---------- тост, счётчик, часы ---------- */
 
   var toast = document.getElementById('toast');
@@ -1156,17 +1356,50 @@
   engine.on('minute', function () {
     LO.ROOMS.forEach(function (r) { updateRoom(r.id); });
   });
-  engine.on('feed', function (entry) { addFeed(entry, true); });
   engine.on('toast', function (t) { showToast(t.title, t.text); });
   engine.on('saved', renderSaved);
   engine.on('reset', function () {
-    buildScene(); renderFeed(); renderSaved(); closeCard();
+    buildScene(); renderSaved(); closeCard();
   });
+
+  /* ---------- переключалка этажей ---------- */
+
+  var floorsBox = document.getElementById('floors');
+  var floorLabel = document.getElementById('floorlabel');
+  LO.FLOORS.forEach(function (fl) {
+    var b = document.createElement('button');
+    b.textContent = fl.num;
+    b.id = 'floorbtn-' + fl.num;
+    if (fl.num === activeFloor) b.className = 'on';
+    b.addEventListener('click', function () { setFloor(fl.num); });
+    floorsBox.appendChild(b);
+  });
+
+  function setFloor(num) {
+    if (num === activeFloor) return;
+    var old = activeFloor;
+    activeFloor = num;
+    // без пересборки: меняем классы, активный этаж наверх стопки
+    var gNew = document.getElementById('floorg-' + num);
+    var gOld = document.getElementById('floorg-' + old);
+    if (gNew && gOld) {
+      gOld.setAttribute('class', 'floorg ghost');
+      gNew.setAttribute('class', 'floorg');
+      gNew.parentNode.appendChild(gNew);
+    }
+    // камера едет к активному этажу
+    view.y += floorOffset(num) - floorOffset(old);
+    applyView();
+    LO.FLOORS.forEach(function (fl) {
+      var b = document.getElementById('floorbtn-' + fl.num);
+      if (b) b.className = fl.num === num ? 'on' : '';
+    });
+    floorLabel.textContent = num + ' этаж';
+  }
 
   /* ---------- старт ---------- */
 
   buildScene();
-  renderFeed();
   renderSaved();
 })();
 /*APP-END*/
