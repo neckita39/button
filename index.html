@@ -39,9 +39,13 @@
   #saved.bump { transform: scale(1.12); }
   #clock { font-family: ui-monospace, Menlo, monospace; font-size: 21px;
     font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
-  #qrlink { padding: 7px 14px; border: 1px solid var(--line); border-radius: 22px;
-    background: rgba(255, 255, 255, .05); color: var(--text); font-size: 13px;
-    text-decoration: none; white-space: nowrap; }
+  #mode { display: inline-flex; border: 1px solid var(--line); border-radius: 22px;
+    overflow: hidden; white-space: nowrap; }
+  #mode > * { padding: 7px 14px; font-size: 13px; text-decoration: none;
+    color: var(--dim); }
+  #mode .on { background: rgba(245, 166, 35, .16); color: var(--amber);
+    font-weight: 650; }
+  #mode a:hover { color: var(--text); }
 
   /* ---------- карта ---------- */
   #stage { position: fixed; inset: 0; touch-action: none; }
@@ -128,10 +132,7 @@
   #card .tlcap { display: flex; justify-content: space-between; margin: 0 16px;
     color: var(--dim); font-size: 10px; font-family: ui-monospace, Menlo, monospace; }
   #card .summary { padding: 10px 16px 0; font-size: 13.5px; color: var(--dim); }
-  #card .actions { padding: 14px 16px 16px; }
-  #card .knock { width: 100%; padding: 12px 0; border-radius: 12px;
-    background: var(--amber); color: #201503; font-weight: 750; font-size: 15px; }
-  #card .knock:active { transform: scale(.985); }
+  #card .cardpad { height: 18px; }
   #card .grab { display: none; }
 
   /* ---------- тост Б24 ---------- */
@@ -192,7 +193,9 @@
   </div>
   <div class="spacer"></div>
   <span id="saved">⚡ спасено сегодня —</span>
-  <a id="qrlink" href="scan.html">QR-тур</a>
+  <nav id="mode">
+    <span class="on">Карта офиса</span><a href="scan.html">Сканирование</a>
+  </nav>
   <span id="clock">--:--:--</span>
 </div>
 
@@ -218,12 +221,13 @@
   <div class="tl"></div>
   <div class="tlcap"><span>9:00</span><span>12:00</span><span>15:00</span><span>19:00</span></div>
   <div class="summary"></div>
-  <div class="actions"><button class="knock">Постучаться</button></div>
+  <div class="cardpad"></div>
 </div>
 
 <div id="toast"><div class="b24">Б24</div><div><div class="tt"></div><div class="tx"></div></div></div>
 
 <script src="shared/core.js"></script>
+<script src="shared/b24.js"></script>
 <script>
 /*APP-START*/
 (function () {
@@ -233,6 +237,10 @@
   var engine = LO.createEngine();
   window.LO_ENGINE = engine;   // для демо-хуков и стыковки с Б24
   LO.mountDemoPanel(engine);
+
+  // живые данные от интеграции: index.html?api=<url> (без параметра — моки)
+  var apiUrl = new URLSearchParams(location.search).get('api');
+  if (apiUrl && window.LivingOfficeB24) LivingOfficeB24.connect(engine, apiUrl);
 
   var S = 30, H = 52, FUN_H = 10;
   var svg = document.getElementById('map');
@@ -386,28 +394,61 @@
   /* столы рассадки: столешница + монитор + стул; «Я» — золотой пин */
   function buildDeskCluster(parent, d) {
     var DW = 1.35, DHt = 1.05, GX = 0.25, GY = 0.45;
+    var BE = '#c8b393', BE1 = '#a8946f', BE2 = '#96825e';
+    function lift(q, up) { return { x: q.x, y: q.y - up }; }
+    function toward(q, cx, cy, k) { return { x: cx + (q.x - cx) * k, y: cy + (q.y - cy) * k }; }
     for (var r = 0; r < d.rows; r++) {
       for (var c = 0; c < d.cols; c++) {
         var name = d.names[r * d.cols + c] || '';
         var rect = { x: d.x + c * (DW + GX), y: d.y + r * (DHt + GY), w: DW, h: DHt };
         var p = iso.prism(rect, S, 7);
         var c2 = iso.center(rect, S);
-        // стул перед столом
-        var ch = iso.project(rect.x + rect.w / 2, rect.y + rect.h + 0.42, S);
-        el('ellipse', { cx: ch.x, cy: ch.y, rx: 6.5, ry: 3.4, fill: '#2a3042',
-          stroke: '#3c445c', 'stroke-width': .7 }, parent);
-        // столешница
-        el('polygon', { points: iso.pts(p.right), fill: '#2b3145' }, parent);
-        el('polygon', { points: iso.pts(p.front), fill: '#252b3d' }, parent);
-        el('polygon', { points: iso.pts(p.top), fill: '#4a5168', stroke: '#5b6378',
-          'stroke-width': .6, 'stroke-opacity': .8 }, parent);
-        // монитор на столе
-        var m0 = iso.project(rect.x + 0.25, rect.y + 0.35, S),
-            m1 = iso.project(rect.x + rect.w - 0.25, rect.y + 0.35, S);
+
+        // бежевая столешница
+        el('polygon', { points: iso.pts(p.right), fill: BE1 }, parent);
+        el('polygon', { points: iso.pts(p.front), fill: BE2 }, parent);
+        el('polygon', { points: iso.pts(p.top), fill: BE, stroke: '#6e5a3d',
+          'stroke-width': .6, 'stroke-opacity': .55 }, parent);
+
+        // ноутбук у дальнего края (~треть ширины стола)
+        var lcx = rect.x + rect.w / 2, yB = rect.y + 0.3, yF = rect.y + 0.66,
+            xL = lcx - 0.22, xR = lcx + 0.22;
+        // клавиатура-база на поверхности
         el('polygon', { points: iso.pts([
-          { x: m0.x, y: m0.y - 17 }, { x: m1.x, y: m1.y - 17 },
-          { x: m1.x, y: m1.y - 8 }, { x: m0.x, y: m0.y - 8 }]),
+          lift(iso.project(xL, yB, S), 7), lift(iso.project(xR, yB, S), 7),
+          lift(iso.project(xR, yF, S), 7), lift(iso.project(xL, yF, S), 7)]),
+          fill: '#20242e', stroke: '#12141c', 'stroke-width': .5 }, parent);
+        // наклонённый экран
+        var sbl = lift(iso.project(xL, yB, S), 7),
+            sbr = lift(iso.project(xR, yB, S), 7),
+            str = lift(iso.project(xR, yB - 0.06, S), 19),
+            stl = lift(iso.project(xL, yB - 0.06, S), 19);
+        el('polygon', { points: iso.pts([sbl, sbr, str, stl]),
           fill: '#0c0e15', stroke: '#5b6378', 'stroke-width': .8 }, parent);
+        var gcx = (sbl.x + sbr.x + str.x + stl.x) / 4,
+            gcy = (sbl.y + sbr.y + str.y + stl.y) / 4;
+        el('polygon', { points: iso.pts([
+          toward(sbl, gcx, gcy, .62), toward(sbr, gcx, gcy, .62),
+          toward(str, gcx, gcy, .62), toward(stl, gcx, gcy, .62)]),
+          fill: '#2e3548' }, parent);
+
+        // чёрное офисное кресло перед столом (южная сторона)
+        var seat = iso.project(rect.x + rect.w / 2, rect.y + rect.h + 0.45, S),
+            back = iso.project(rect.x + rect.w / 2, rect.y + rect.h + 0.72, S);
+        // крестовина-основание на полу
+        el('ellipse', { cx: seat.x, cy: seat.y + 1, rx: 6.5, ry: 3.1, fill: '#12141c' }, parent);
+        // спинка за сиденьем (дальше от стола)
+        el('polygon', { points: iso.pts([
+          { x: back.x - 4.5, y: back.y - 7 }, { x: back.x + 4.5, y: back.y - 7 },
+          { x: back.x + 4,   y: back.y - 20 }, { x: back.x - 4, y: back.y - 20 }]),
+          fill: '#16181f', stroke: '#2c3242', 'stroke-width': .7 }, parent);
+        // стойка
+        el('line', { x1: seat.x, y1: seat.y, x2: seat.x, y2: seat.y - 8,
+          stroke: '#2c3242', 'stroke-width': 2 }, parent);
+        // сиденье
+        el('ellipse', { cx: seat.x, cy: seat.y - 8, rx: 6.5, ry: 3.4,
+          fill: '#16181f', stroke: '#2c3242', 'stroke-width': .7 }, parent);
+
         if (name.indexOf('(я)') > -1) {
           el('circle', { 'class': 'me-pin', cx: c2.x, cy: c2.y - 26, r: 5.5,
             fill: '#f5c542', stroke: '#0b0d13', 'stroke-width': 1.5 }, parent);
@@ -486,6 +527,116 @@
     el('circle', { cx: ball.x, cy: ball.y - TH - 2, r: 2, fill: '#f5f7fb' }, g);
 
     var lb = el('text', { x: c.x, y: c.y + (z.rect.h * S * .5) + 22, 'text-anchor': 'middle',
+      'font-size': 10.5, fill: '#8b93ab', 'font-weight': 650,
+      'paint-order': 'stroke', stroke: 'rgba(8,10,16,.8)', 'stroke-width': 3 }, g);
+    lb.textContent = z.name;
+  }
+
+  /* кикер: тёмный корпус, зелёное поле, штанги с ручками и игроками */
+  function buildFoosball(parent, z) {
+    var g = el('g', { 'class': 'funzone', id: 'fun-football' }, parent);
+    g.addEventListener('click', function (e) { e.stopPropagation(); openCard(z); });
+    var r = { x: z.rect.x + 0.15, y: z.rect.y + 0.15, w: z.rect.w - 0.3, h: z.rect.h - 0.3 };
+    var TH = 20, BODY = 11;
+    var c = iso.center(z.rect, S);
+
+    el('ellipse', { cx: c.x, cy: c.y + 3, rx: (r.w + r.h) * S * .42,
+      ry: (r.w + r.h) * S * .2, fill: 'rgba(0,0,0,.35)' }, g);
+
+    [[r.x + .25, r.y + .2], [r.x + r.w - .25, r.y + .2],
+     [r.x + .25, r.y + r.h - .2], [r.x + r.w - .25, r.y + r.h - .2]]
+      .forEach(function (pt) {
+        var p = iso.project(pt[0], pt[1], S);
+        el('line', { x1: p.x, y1: p.y, x2: p.x, y2: p.y - (TH - BODY + 2),
+          stroke: '#c9cede', 'stroke-width': 3 }, g);
+      });
+
+    var p = iso.prism(r, S, TH);
+    function drop(q, d) { return { x: q.x, y: q.y + d }; }
+    el('polygon', { points: iso.pts([p.top[1], p.top[2], drop(p.top[2], BODY), drop(p.top[1], BODY)]),
+      fill: '#20253a' }, g);
+    el('polygon', { points: iso.pts([p.top[3], p.top[2], drop(p.top[2], BODY), drop(p.top[3], BODY)]),
+      fill: '#1a1f31' }, g);
+    el('polygon', { points: iso.pts(p.top), fill: '#3f7d4a',
+      stroke: '#262b3d', 'stroke-width': 2.4 }, g);
+
+    // разметка поля
+    var in0 = { x: r.x + 0.18, y: r.y + 0.18, w: r.w - 0.36, h: r.h - 0.36 };
+    el('polygon', { points: iso.pts(iso.rectCorners(in0).map(function (q) {
+      var pr = iso.project(q.x, q.y, S); return { x: pr.x, y: pr.y - TH };
+    })), fill: 'none', stroke: 'rgba(240,244,255,.65)', 'stroke-width': .8 }, g);
+    var mid = r.y + r.h / 2;
+    var m0 = iso.project(r.x + 0.18, mid, S), m1 = iso.project(r.x + r.w - 0.18, mid, S);
+    el('line', { x1: m0.x, y1: m0.y - TH, x2: m1.x, y2: m1.y - TH,
+      stroke: 'rgba(240,244,255,.65)', 'stroke-width': .8 }, g);
+    var cc = iso.project(r.x + r.w / 2, mid, S);
+    el('ellipse', { cx: cc.x, cy: cc.y - TH, rx: 6, ry: 3,
+      fill: 'none', stroke: 'rgba(240,244,255,.65)', 'stroke-width': .8 }, g);
+
+    // штанги с ручками и игроками
+    [0.22, 0.42, 0.62, 0.82].forEach(function (t, k) {
+      var yk = r.y + r.h * t;
+      var a = iso.project(r.x - 0.32, yk, S), b = iso.project(r.x + r.w + 0.32, yk, S);
+      var RY = TH + 4;
+      el('line', { x1: a.x, y1: a.y - RY, x2: b.x, y2: b.y - RY,
+        stroke: '#aeb6c8', 'stroke-width': 1.6 }, g);
+      el('line', { x1: b.x, y1: b.y - RY, x2: b.x + 5, y2: b.y - RY + 2.5,
+        stroke: '#f5c542', 'stroke-width': 3.4, 'stroke-linecap': 'round' }, g);
+      var col = k % 2 ? '#3d6fd8' : '#d64545';
+      [0.3, 0.55, 0.8].forEach(function (u) {
+        var q = iso.project(r.x + r.w * u, yk, S);
+        el('line', { x1: q.x, y1: q.y - RY, x2: q.x, y2: q.y - TH + 1,
+          stroke: col, 'stroke-width': 2.4 }, g);
+        el('circle', { cx: q.x, cy: q.y - RY - 1.5, r: 1.5, fill: col }, g);
+      });
+    });
+    var ball = iso.project(r.x + r.w / 2 + 0.15, mid + 0.15, S);
+    el('circle', { cx: ball.x, cy: ball.y - TH - 1.5, r: 1.8, fill: '#f5f7fb' }, g);
+
+    var lb = el('text', { x: c.x, y: c.y + (z.rect.h * S * .5) + 22, 'text-anchor': 'middle',
+      'font-size': 10.5, fill: '#8b93ab', 'font-weight': 650,
+      'paint-order': 'stroke', stroke: 'rgba(8,10,16,.8)', 'stroke-width': 3 }, g);
+    lb.textContent = z.name;
+  }
+
+  /* массажное кресло-ямагучи: бежевый лежак с подголовником и подлокотниками */
+  function buildMassage(parent, z) {
+    var g = el('g', { 'class': 'funzone', id: 'fun-massage' }, parent);
+    g.addEventListener('click', function (e) { e.stopPropagation(); openCard(z); });
+    var r = z.rect;
+    var c = iso.center(r, S);
+
+    el('ellipse', { cx: c.x, cy: c.y + 2, rx: (r.w + r.h) * S * .38,
+      ry: (r.w + r.h) * S * .18, fill: 'rgba(0,0,0,.35)' }, g);
+
+    function box(rr, h, top, side1, side2, lift) {
+      var p = iso.prism(rr, S, h);
+      var up = lift || 0;
+      function u(q) { return { x: q.x, y: q.y - up }; }
+      el('polygon', { points: iso.pts(p.right.map(u)), fill: side1 }, g);
+      el('polygon', { points: iso.pts(p.front.map(u)), fill: side2 }, g);
+      el('polygon', { points: iso.pts(p.top.map(u)), fill: top,
+        stroke: '#6e5a3d', 'stroke-width': .5, 'stroke-opacity': .5 }, g);
+    }
+    var BE = '#c8b393', BE1 = '#a8946f', BE2 = '#96825e';
+
+    // подставка для ног (перед), сиденье (середина), спинка (зад, высокая)
+    box({ x: r.x + 0.35, y: r.y + r.h - 0.5, w: r.w - 0.7, h: 0.45 }, 7,  BE, BE1, BE2);
+    box({ x: r.x + 0.3,  y: r.y + 0.55,      w: r.w - 0.6, h: r.h - 1.05 }, 11, BE, BE1, BE2);
+    box({ x: r.x + 0.32, y: r.y + 0.12,      w: r.w - 0.64, h: 0.5 }, 26, BE, BE1, BE2);
+    // подлокотники
+    box({ x: r.x + 0.05, y: r.y + 0.5, w: 0.28, h: r.h - 0.9 }, 15, BE1, BE2, BE2);
+    box({ x: r.x + r.w - 0.33, y: r.y + 0.5, w: 0.28, h: r.h - 0.9 }, 15, BE1, BE2, BE2);
+    // подушка-подголовник
+    var hp = iso.project(r.x + r.w / 2, r.y + 0.38, S);
+    el('ellipse', { cx: hp.x, cy: hp.y - 27, rx: 7.5, ry: 4.2,
+      fill: '#e2d2b4', stroke: '#96825e', 'stroke-width': .8 }, g);
+    // шов на сиденье
+    var s0 = iso.project(r.x + 0.35, r.y + 1.05, S), s1 = iso.project(r.x + r.w - 0.35, r.y + 1.05, S);
+    el('line', { x1: s0.x, y1: s0.y - 11, x2: s1.x, y2: s1.y - 11,
+      stroke: '#96825e', 'stroke-width': .8, 'stroke-opacity': .8 }, g);
+
+    var lb = el('text', { x: c.x, y: c.y + (r.h * S * .5) + 24, 'text-anchor': 'middle',
       'font-size': 10.5, fill: '#8b93ab', 'font-weight': 650,
       'paint-order': 'stroke', stroke: 'rgba(8,10,16,.8)', 'stroke-width': 3 }, g);
     lb.textContent = z.name;
@@ -620,6 +771,8 @@
 
   function buildFun(parent, z) {
     if (z.id === 'tennis') return buildTennis(parent, z);
+    if (z.id === 'football') return buildFoosball(parent, z);
+    if (z.id === 'massage') return buildMassage(parent, z);
     var p = iso.prism(z.rect, S, FUN_H);
     var c = iso.center(z.rect, S);
     var g = el('g', { 'class': 'funzone', id: 'fun-' + z.id }, parent);
@@ -770,15 +923,14 @@
     next: card.querySelector('.next'),
     tl: card.querySelector('.tl'),
     tlcap: card.querySelector('.tlcap'),
-    summary: card.querySelector('.summary'),
-    knock: card.querySelector('.knock')
+    summary: card.querySelector('.summary')
   };
 
   function openCard(place) {
     cardPlace = place;
     fillCard(true);
     card.classList.add('show');
-    if (window.matchMedia('(max-width: 760px)').matches) backdrop.classList.add('show');
+    backdrop.classList.add('show');
   }
   function closeCard() {
     cardPlace = null;
@@ -829,12 +981,10 @@
       cEls.tl.style.display = 'none';
       cEls.tlcap.style.display = 'none';
       cEls.summary.textContent = 'Просто приходи, когда свободно 🙂';
-      cEls.knock.style.display = 'none';
       return;
     }
     cEls.tl.style.display = '';
     cEls.tlcap.style.display = '';
-    cEls.knock.style.display = '';
 
     var st = engine.getState(p.id);
     if (st.status === 'occupied') {
@@ -897,10 +1047,6 @@
         (engine.now() - wd2.start) / (wd2.end - wd2.start) * 100)) + '%';
     }
   }
-
-  cEls.knock.addEventListener('click', function () {
-    showToast('Живой офис', 'Постучались в «' + cardPlace.name + '» — отправлено в чат Б24');
-  });
 
   /* ---------- лента ---------- */
 

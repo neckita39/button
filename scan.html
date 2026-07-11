@@ -26,6 +26,12 @@
   #topbar .hint { color: var(--dim); font-size: 13px; }
   #topbar .clock { margin-left: auto; font-family: ui-monospace, Menlo, monospace;
     font-size: 13px; color: var(--dim); }
+  #mode { display: inline-flex; border: 1px solid var(--line); border-radius: 20px;
+    overflow: hidden; white-space: nowrap; margin-left: 8px; }
+  #mode > * { padding: 5px 11px; font-size: 12px; text-decoration: none;
+    color: var(--dim); }
+  #mode .on { background: rgba(245, 166, 35, .16); color: var(--amber);
+    font-weight: 650; }
 
   /* карточка комнаты */
   #card { position: fixed; z-index: 6; width: 300px; max-width: calc(100vw - 24px);
@@ -122,6 +128,7 @@
 <div id="topbar">
   <span class="logo">Живой офис</span>
   <span class="hint">наведи камеру на QR у двери</span>
+  <nav id="mode"><a href="index.html">Карта офиса</a><span class="on">Сканирование</span></nav>
   <span class="clock" id="clock"></span>
 </div>
 
@@ -159,6 +166,7 @@
 
 <script src="vendor/jsQR.js"></script>
 <script src="shared/core.js"></script>
+<script src="shared/b24.js"></script>
 <script>
 /*APP-START*/
 (function () {
@@ -166,6 +174,10 @@
   var LO = window.LivingOffice;
   var engine = LO.createEngine();
   LO.mountDemoPanel(engine);
+
+  // живые данные от интеграции: scan.html?api=<url> (без параметра — моки)
+  var apiUrl = new URLSearchParams(location.search).get('api');
+  if (apiUrl && window.LivingOfficeB24) LivingOfficeB24.connect(engine, apiUrl);
 
   var video = document.getElementById('video');
   var ar = document.getElementById('ar');
@@ -449,8 +461,24 @@
     chips.appendChild(c);
   });
 
+  /* открытие по ссылке из QR: scan.html#<room-id> */
+  function openFromHash() {
+    var id = decodeURIComponent(location.hash.slice(1) || '').toLowerCase();
+    if (!id) return;
+    var p = placeById(id);
+    if (!p) return;
+    shown = p;
+    target = null;
+    fillCard(true);
+    card.classList.add('docked');
+    card.classList.add('show');
+    hintbox.classList.add('off');
+  }
+  window.addEventListener('hashchange', openFromHash);
+
   startCamera();
   requestAnimationFrame(scanFrame);
+  openFromHash();
 })();
 /*APP-END*/
 </script>

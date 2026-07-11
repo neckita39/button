@@ -39,9 +39,15 @@
   var grid = document.getElementById('grid');
   var places = LO.ROOMS.concat(LO.FUNZONES);
 
+  /* QR кодирует ссылку: камера телефона открывает сайт сразу с нужной
+     переговоркой (scan.html#id). С file:// падаем на короткий payload. */
+  var base = /^https?:/.test(location.protocol)
+    ? location.origin + location.pathname.replace(/qr\.html$/, '') + 'scan.html#'
+    : 'room:';
+
   places.forEach(function (p) {
     var qr = qrcode(0, 'M');
-    qr.addData('room:' + p.id);
+    qr.addData(base + p.id);
     qr.make();
 
     var tag = document.createElement('div');
