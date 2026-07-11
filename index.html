@@ -419,6 +419,78 @@
     }
   }
 
+  /* теннисный стол: синяя плита на ножках, разметка, сетка, ракетки, мяч */
+  function buildTennis(parent, z) {
+    var g = el('g', { 'class': 'funzone', id: 'fun-tennis' }, parent);
+    g.addEventListener('click', function (e) { e.stopPropagation(); openCard(z); });
+    var r = { x: z.rect.x + 0.5, y: z.rect.y + 0.4, w: z.rect.w - 1, h: z.rect.h - 0.8 };
+    var TH = 16, NH = 8;
+    var c = iso.center(z.rect, S);
+
+    el('ellipse', { cx: c.x, cy: c.y + 3, rx: (r.w + r.h) * S * .4,
+      ry: (r.w + r.h) * S * .19, fill: 'rgba(0,0,0,.35)' }, g);
+
+    [[r.x + .35, r.y + .3], [r.x + r.w - .35, r.y + .3],
+     [r.x + .35, r.y + r.h - .3], [r.x + r.w - .35, r.y + r.h - .3]]
+      .forEach(function (pt) {
+        var p = iso.project(pt[0], pt[1], S);
+        el('line', { x1: p.x, y1: p.y, x2: p.x, y2: p.y - TH,
+          stroke: '#161a26', 'stroke-width': 3.5 }, g);
+      });
+
+    var p = iso.prism(r, S, TH);
+    function drop(q, d) { return { x: q.x, y: q.y + d }; }
+    el('polygon', { points: iso.pts([p.top[1], p.top[2], drop(p.top[2], 3), drop(p.top[1], 3)]),
+      fill: '#1c3f63' }, g);
+    el('polygon', { points: iso.pts([p.top[3], p.top[2], drop(p.top[2], 3), drop(p.top[3], 3)]),
+      fill: '#17395b' }, g);
+    el('polygon', { points: iso.pts(p.top), fill: '#2b5d8c',
+      stroke: '#e8edf5', 'stroke-width': 1.2, 'stroke-opacity': .85 }, g);
+
+    // центральная линия вдоль стола
+    var l0 = iso.project(r.x + .12, r.y + r.h / 2, S),
+        l1 = iso.project(r.x + r.w - .12, r.y + r.h / 2, S);
+    el('line', { x1: l0.x, y1: l0.y - TH, x2: l1.x, y2: l1.y - TH,
+      stroke: '#e8edf5', 'stroke-width': 1, 'stroke-opacity': .8 }, g);
+
+    // сетка поперёк с ниточками и стойками
+    var n0 = iso.project(r.x + r.w / 2, r.y - 0.08, S),
+        n1 = iso.project(r.x + r.w / 2, r.y + r.h + 0.08, S);
+    el('polygon', { points: iso.pts([
+      { x: n0.x, y: n0.y - TH - NH }, { x: n1.x, y: n1.y - TH - NH },
+      { x: n1.x, y: n1.y - TH }, { x: n0.x, y: n0.y - TH }]),
+      fill: 'rgba(226,232,244,.26)' }, g);
+    for (var i = 1; i < 8; i++) {
+      var t = i / 8, nx = n0.x + (n1.x - n0.x) * t, ny = n0.y + (n1.y - n0.y) * t;
+      el('line', { x1: nx, y1: ny - TH - NH, x2: nx, y2: ny - TH,
+        stroke: 'rgba(226,232,244,.4)', 'stroke-width': .6 }, g);
+    }
+    el('line', { x1: n0.x, y1: n0.y - TH - NH, x2: n1.x, y2: n1.y - TH - NH,
+      stroke: '#eef2f8', 'stroke-width': 1.7 }, g);
+    el('line', { x1: n0.x, y1: n0.y - TH, x2: n0.x, y2: n0.y - TH - NH,
+      stroke: '#c9cede', 'stroke-width': 1.6 }, g);
+    el('line', { x1: n1.x, y1: n1.y - TH, x2: n1.x, y2: n1.y - TH - NH,
+      stroke: '#c9cede', 'stroke-width': 1.6 }, g);
+
+    // ракетки и мяч
+    function paddle(px, py, color) {
+      var q = iso.project(px, py, S);
+      el('line', { x1: q.x + 3.5, y1: q.y - TH + 1, x2: q.x + 7.5, y2: q.y - TH + 3.5,
+        stroke: '#8a6d3f', 'stroke-width': 2.2 }, g);
+      el('ellipse', { cx: q.x, cy: q.y - TH - 1, rx: 5, ry: 3.2,
+        fill: color, stroke: '#12151d', 'stroke-width': .8 }, g);
+    }
+    paddle(r.x + 1.4, r.y + 0.55, '#d64545');
+    paddle(r.x + r.w - 1.3, r.y + r.h - 0.5, '#2b2f3d');
+    var ball = iso.project(r.x + r.w - 1.1, r.y + 0.6, S);
+    el('circle', { cx: ball.x, cy: ball.y - TH - 2, r: 2, fill: '#f5f7fb' }, g);
+
+    var lb = el('text', { x: c.x, y: c.y + (z.rect.h * S * .5) + 22, 'text-anchor': 'middle',
+      'font-size': 10.5, fill: '#8b93ab', 'font-weight': 650,
+      'paint-order': 'stroke', stroke: 'rgba(8,10,16,.8)', 'stroke-width': 3 }, g);
+    lb.textContent = z.name;
+  }
+
   /* ресепшн (дерево + мосс-стена Битрикс24) и лифт */
   function buildDecor(parent, d) {
     var c = iso.center(d.rect, S);
@@ -547,6 +619,7 @@
   }
 
   function buildFun(parent, z) {
+    if (z.id === 'tennis') return buildTennis(parent, z);
     var p = iso.prism(z.rect, S, FUN_H);
     var c = iso.center(z.rect, S);
     var g = el('g', { 'class': 'funzone', id: 'fun-' + z.id }, parent);
