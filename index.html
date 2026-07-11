@@ -463,7 +463,11 @@
   /* теннисный стол: синяя плита на ножках, разметка, сетка, ракетки, мяч */
   function buildTennis(parent, z) {
     var g = el('g', { 'class': 'funzone', id: 'fun-tennis' }, parent);
-    g.addEventListener('click', function (e) { e.stopPropagation(); openCard(z); });
+    g.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (consumeDrag()) return;
+      openCard(z);
+    });
     var r = { x: z.rect.x + 0.5, y: z.rect.y + 0.4, w: z.rect.w - 1, h: z.rect.h - 0.8 };
     var TH = 16, NH = 8;
     var c = iso.center(z.rect, S);
@@ -535,7 +539,11 @@
   /* кикер: тёмный корпус, зелёное поле, штанги с ручками и игроками */
   function buildFoosball(parent, z) {
     var g = el('g', { 'class': 'funzone', id: 'fun-football' }, parent);
-    g.addEventListener('click', function (e) { e.stopPropagation(); openCard(z); });
+    g.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (consumeDrag()) return;
+      openCard(z);
+    });
     var r = { x: z.rect.x + 0.15, y: z.rect.y + 0.15, w: z.rect.w - 0.3, h: z.rect.h - 0.3 };
     var TH = 20, BODY = 11;
     var c = iso.center(z.rect, S);
@@ -602,7 +610,11 @@
   /* массажное кресло-ямагучи: бежевый лежак с подголовником и подлокотниками */
   function buildMassage(parent, z) {
     var g = el('g', { 'class': 'funzone', id: 'fun-massage' }, parent);
-    g.addEventListener('click', function (e) { e.stopPropagation(); openCard(z); });
+    g.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (consumeDrag()) return;
+      openCard(z);
+    });
     var r = z.rect;
     var c = iso.center(r, S);
 
@@ -688,7 +700,11 @@
     var p = iso.prism(r.rect, S, H);
     var c = iso.center(r.rect, S);
     var g = el('g', { 'class': 'room', id: 'room-' + r.id }, parent);
-    g.addEventListener('click', function (e) { e.stopPropagation(); openCard(r); });
+    g.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (consumeDrag()) return;
+      openCard(r);
+    });
 
     // аура ожидания и световое пятно на полу
     var rx = Math.max(60, (r.rect.w + r.rect.h) * S * .62);
@@ -776,7 +792,11 @@
     var p = iso.prism(z.rect, S, FUN_H);
     var c = iso.center(z.rect, S);
     var g = el('g', { 'class': 'funzone', id: 'fun-' + z.id }, parent);
-    g.addEventListener('click', function (e) { e.stopPropagation(); openCard(z); });
+    g.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (consumeDrag()) return;
+      openCard(z);
+    });
     el('polygon', { points: iso.pts(p.right), fill: '#232939' }, g);
     el('polygon', { points: iso.pts(p.front), fill: '#1e2333' }, g);
     el('polygon', { points: iso.pts(p.top), fill: '#2a3147', stroke: '#3a4258',
@@ -863,19 +883,27 @@
   }
   var pointers = new Map();
   var pinch = null;
+  var dragging = false;
+  /* клик и пан различаем по порогу движения — захват указателя «съедал» клики */
+  function consumeDrag() {
+    if (dragging) { dragging = false; return true; }
+    return false;
+  }
   svg.addEventListener('pointerdown', function (e) {
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    svg.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
+    if (pointers.size === 1) dragging = false;
     if (pointers.size === 2) {
       var ps = Array.from(pointers.values());
       pinch = { d: Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y), w: view.w };
+      dragging = true;
     }
   });
   svg.addEventListener('pointermove', function (e) {
     var pt = pointers.get(e.pointerId);
     if (!pt) return;
+    if (!dragging && Math.hypot(e.clientX - pt.sx, e.clientY - pt.sy) > 6) dragging = true;
     var k = view.w / svg.clientWidth;
-    if (pointers.size === 1) {
+    if (pointers.size === 1 && dragging) {
       view.x -= (e.clientX - pt.x) * k;
       view.y -= (e.clientY - pt.y) * k;
       applyView();
@@ -939,7 +967,7 @@
   }
   card.querySelector('.close').addEventListener('click', closeCard);
   backdrop.addEventListener('click', closeCard);
-  svg.addEventListener('click', function () { if (!pointers.size) closeCard(); });
+  svg.addEventListener('click', function () { if (consumeDrag()) return; closeCard(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeCard(); });
 
   function chip(text) {
